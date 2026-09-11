@@ -1,0 +1,12 @@
+# --- Environment & secrets ---
+.env
+
+# --- Dependencies ---
+node_modules/
+
+# --- Runtime logs ---
+*.log
+
+# --- IDE / OS ---
+.DS_Store
+Thumbs.db

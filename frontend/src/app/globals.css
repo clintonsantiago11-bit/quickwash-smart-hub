@@ -1,0 +1,1494 @@
+@import "tailwindcss";
+
+@theme {
+  --font-display: var(--font-ui), "Inter", sans-serif;
+  --font-mono: var(--font-mono), "JetBrains Mono", monospace;
+  --font-ui: var(--font-ui), "Inter", sans-serif;
+}
+
+:root {
+  /* Light Theme (Muted/Soft) */
+  --bg-base: #E2E8F0;
+  --bg-elevated: #F8FAFC;
+  --bg-input: #F1F5F9;
+  --bg-hover: #E2E8F0;
+  --border: rgba(15, 23, 42, 0.08);
+  --text-primary: #1E293B;
+  --text-secondary: #475569;
+  --text-muted: #64748B;
+  --accent: #0284C7;
+  --accent-glow: rgba(2, 132, 199, 0.1);
+  --success: #10B981;
+  --success-muted: rgba(16, 185, 129, 0.1);
+  --danger: #EF4444;
+  --danger-muted: rgba(239, 68, 68, 0.1);
+  --warning: #F59E0B;
+  --container-px: clamp(0.75rem, 3vw, 2.5rem);
+  --card-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
+}
+
+.dark {
+  /* Dark Theme */
+  --bg-base: #020617;
+  --bg-elevated: #0F172A;
+  --bg-input: #1E293B;
+  --bg-hover: #334155;
+  --border: rgba(255, 255, 255, 0.08);
+  --text-primary: #F8FAFC;
+  --text-secondary: #CBD5E1;
+  --text-muted: #64748B;
+  --accent: #38BDF8;
+  --accent-glow: rgba(56, 189, 248, 0.3);
+  --success: #34D399;
+  --success-muted: rgba(52, 211, 153, 0.1);
+  --danger: #F87171;
+  --danger-muted: rgba(248, 113, 113, 0.1);
+  --warning: #FBBF24;
+  --card-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -4px rgba(0, 0, 0, 0.3);
+}
+
+.font-display {
+  font-family: var(--font-display);
+  letter-spacing: -0.04em;
+}
+
+.font-mono {
+  font-family: var(--font-mono);
+  letter-spacing: 0.02em;
+}
+
+@layer base {
+  * {
+    @apply border-transparent;
+  }
+
+  body {
+    @apply bg-[var(--bg-base)] text-[var(--text-primary)] font-[var(--font-ui)];
+    margin: 0;
+    padding: 0;
+    overflow-x: hidden;
+    font-size: 0.9375rem;
+    /* 15px optimized professional body font size */
+    line-height: 1.6;
+    letter-spacing: -0.01em;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: var(--font-display);
+    letter-spacing: -0.03em;
+    line-height: 1.25;
+    font-weight: 700;
+  }
+
+  p {
+    line-height: 1.6;
+  }
+
+  input,
+  select,
+  textarea,
+  button {
+    font-family: inherit;
+    font-size: inherit;
+  }
+}
+
+@layer components {
+  .card {
+    @apply bg-[var(--bg-elevated)] border border-[var(--border)] rounded-2xl sm:rounded-3xl shadow-[var(--card-shadow)] transition-all duration-300;
+  }
+
+  .badge {
+    @apply inline-flex items-center justify-center px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest whitespace-nowrap min-w-fit;
+    line-height: 1.2;
+  }
+
+  .badge-online {
+    @apply bg-[var(--success-muted)] text-[var(--success)] border border-[var(--success)]/30;
+  }
+
+  .badge-offline {
+    @apply bg-[var(--danger-muted)] text-[var(--danger)];
+  }
+
+  .btn {
+    @apply px-4 py-2 rounded-xl font-bold transition-all active:scale-95 disabled:opacity-50 disabled:pointer-events-none cursor-pointer;
+  }
+
+  .btn-primary {
+    @apply bg-[var(--accent)] text-[var(--bg-base)] hover:shadow-[0_0_20px_var(--accent-glow)];
+  }
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-[var(--text-muted)]/20 rounded-full hover:bg-[var(--text-muted)]/40 transition-colors;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.5s ease-out forwards;
+}
+
+/* ===== LOGIN PAGE — SIDE-PROFILE 3D CAR WASH & MULTI-VEHICLE ANIMATIONS ===== */
+
+/* Blueprint grid background with radial dark vignette */
+.blueprint-grid {
+  background-image:
+    linear-gradient(rgba(0, 180, 216, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 180, 216, 0.05) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+/* 3D perspective stage */
+.perspective-stage {
+  perspective: 1200px;
+  perspective-origin: 50% 45%;
+}
+
+/* Gantry Horizontal Sweep — glides back & forth across the vehicle side-profile */
+@keyframes gantrySweepHorizontal {
+  0% {
+    transform: translateX(-460px) translateY(0);
+  }
+
+  5% {
+    transform: translateX(-484px) translateY(-3px);
+  }
+
+  11% {
+    transform: translateX(-470px) translateY(0);
+  }
+
+  44% {
+    transform: translateX(460px) translateY(0);
+  }
+
+  49% {
+    transform: translateX(484px) translateY(-3px);
+  }
+
+  55% {
+    transform: translateX(470px) translateY(0);
+  }
+
+  88% {
+    transform: translateX(-460px) translateY(0);
+  }
+
+  93% {
+    transform: translateX(-484px) translateY(-3px);
+  }
+
+  100% {
+    transform: translateX(-460px) translateY(0);
+  }
+}
+
+.animate-gantry-sweep {
+  animation: gantrySweepHorizontal 8s ease-in-out infinite;
+}
+
+/* Gantry chassis leans into its travel direction (synced to the 8s sweep) */
+@keyframes gantryTravelLean {
+  0% {
+    transform: rotate(0.7deg);
+  }
+
+  25% {
+    transform: rotate(-0.9deg);
+  }
+
+  50% {
+    transform: rotate(-0.7deg);
+  }
+
+  75% {
+    transform: rotate(0.9deg);
+  }
+
+  100% {
+    transform: rotate(0.7deg);
+  }
+}
+
+.animate-gantry-lean {
+  animation: gantryTravelLean 8s ease-in-out infinite;
+  transform-box: fill-box;
+  transform-origin: center center;
+}
+
+/* Gentle mechanical bob riding on top of the sweep */
+@keyframes gantryBobRide {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+.animate-gantry-bob {
+  animation: gantryBobRide 3.8s ease-in-out infinite;
+  transform-box: fill-box;
+}
+
+/* Top Horizontal Contour Brush Spinning */
+@keyframes topBrushSpin {
+  0% {
+    transform: rotate(0deg);
+  }
+
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-top-brush {
+  animation: topBrushSpin 0.7s linear infinite;
+  transform-origin: center center;
+  transform-box: fill-box;
+}
+
+/* Vertical Wheel Blaster Brush Spinning */
+@keyframes wheelBrushSpin {
+  0% {
+    transform: rotate(0deg);
+  }
+
+  100% {
+    transform: rotate(-360deg);
+  }
+}
+
+.animate-wheel-brush {
+  animation: wheelBrushSpin 0.9s linear infinite;
+  transform-origin: center center;
+  transform-box: fill-box;
+}
+
+/* Laser scan line sweeping down over the vehicle */
+@keyframes laserScan {
+  0% {
+    transform: translateY(-95px);
+    opacity: 0.1;
+  }
+
+  30% {
+    opacity: 0.9;
+  }
+
+  70% {
+    opacity: 0.9;
+  }
+
+  100% {
+    transform: translateY(115px);
+    opacity: 0.1;
+  }
+}
+
+.animate-laser-scan {
+  animation: laserScan 4.5s ease-in-out infinite alternate;
+  transform-box: fill-box;
+  transform-origin: center center;
+}
+
+/* Neon glow pulse on machine gantry */
+@keyframes neonCyanPulse {
+
+  0%,
+  100% {
+    filter: drop-shadow(0 0 4px rgba(0, 180, 216, 0.6)) drop-shadow(0 0 12px rgba(0, 180, 216, 0.3));
+    opacity: 0.85;
+  }
+
+  50% {
+    filter: drop-shadow(0 0 10px rgba(0, 180, 216, 0.95)) drop-shadow(0 0 24px rgba(56, 189, 248, 0.6));
+    opacity: 1;
+  }
+}
+
+.animate-neon-cyan {
+  animation: neonCyanPulse 2.2s ease-in-out infinite;
+}
+
+/* Water jet high-pressure downward stream spray */
+@keyframes waterJetDownward {
+
+  0%,
+  100% {
+    opacity: 0.8;
+    transform: scaleY(0.96) scaleX(0.95) translateX(0);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scaleY(1.04) scaleX(1.05) translateX(2px);
+  }
+}
+
+.animate-water-downward {
+  animation: waterJetDownward 0.4s ease-in-out infinite alternate;
+  transform-origin: top center;
+  transform-box: fill-box;
+}
+
+/* Vertical Side Brush Spinning (classic car-wash side brushes) */
+@keyframes sideBrushSpin {
+  0% {
+    transform: rotate(0deg);
+  }
+
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-side-brush {
+  animation: sideBrushSpin 1.1s linear infinite;
+  transform-origin: center center;
+  transform-box: fill-box;
+}
+
+/* Tire rotation */
+@keyframes tireSpin {
+  0% {
+    transform: rotate(0deg);
+  }
+
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-tire-spin {
+  animation: tireSpin 2s linear infinite;
+  transform-origin: center center;
+  transform-box: fill-box;
+}
+
+/* Headlight flicker */
+@keyframes headlightFlicker {
+
+  0%,
+  100% {
+    opacity: 0.9;
+    filter: drop-shadow(0 0 8px rgba(56, 189, 248, 0.8));
+  }
+
+  50% {
+    opacity: 0.6;
+    filter: drop-shadow(0 0 4px rgba(56, 189, 248, 0.4));
+  }
+
+  75% {
+    opacity: 1;
+    filter: drop-shadow(0 0 12px rgba(56, 189, 248, 1));
+  }
+}
+
+.animate-headlight {
+  animation: headlightFlicker 3s ease-in-out infinite;
+}
+
+/* LED Chase Strip along the crossbeam */
+@keyframes ledChase {
+  0% {
+    stroke-dashoffset: 0;
+  }
+
+  100% {
+    stroke-dashoffset: -52;
+  }
+}
+
+.animate-led-chase {
+  animation: ledChase 0.9s linear infinite;
+}
+
+/* Falling water droplets dripping from the crossbeam onto the vehicle */
+@keyframes dropletFall {
+  0% {
+    transform: translateY(0) scale(1);
+    opacity: 0;
+  }
+
+  12% {
+    opacity: 0.9;
+  }
+
+  85% {
+    opacity: 0.5;
+  }
+
+  100% {
+    transform: translateY(300px) scale(0.7);
+    opacity: 0;
+  }
+}
+
+.animate-droplet {
+  animation: dropletFall 2.2s ease-in infinite;
+}
+
+/* Steam drifting up from the wet floor */
+@keyframes steamDrift {
+  0% {
+    transform: translateX(0) translateY(0) scale(1);
+    opacity: 0;
+  }
+
+  25% {
+    opacity: 0.3;
+  }
+
+  100% {
+    transform: translateX(40px) translateY(-46px) scale(2.4);
+    opacity: 0;
+  }
+}
+
+.animate-steam {
+  animation: steamDrift 5.5s ease-in-out infinite;
+}
+
+/* Control panel indicator light blink */
+@keyframes blinkLight {
+
+  0%,
+  100% {
+    opacity: 1;
+    filter: drop-shadow(0 0 4px currentColor);
+  }
+
+  50% {
+    opacity: 0.25;
+  }
+}
+
+.animate-blink-light {
+  animation: blinkLight 1.6s ease-in-out infinite;
+}
+
+/* Articulated top brush arm gentle vertical bob */
+@keyframes brushBob {
+
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+.animate-brush-bob {
+  animation: brushBob 2.4s ease-in-out infinite;
+}
+
+/* Dynamic Foam mist particles */
+@keyframes foamMistPuff {
+  0% {
+    transform: scale(0.8) translateY(0);
+    opacity: 0.9;
+  }
+
+  50% {
+    transform: scale(1.3) translateY(8px);
+    opacity: 0.5;
+  }
+
+  100% {
+    transform: scale(1.8) translateY(18px);
+    opacity: 0;
+  }
+}
+
+.animate-foam-puff {
+  animation: foamMistPuff 0.8s ease-out infinite;
+  transform-box: fill-box;
+  transform-origin: center center;
+}
+
+/* Wet floor conveyor track line motion */
+@keyframes conveyorMove {
+  0% {
+    stroke-dashoffset: 0;
+  }
+
+  100% {
+    stroke-dashoffset: -32;
+  }
+}
+
+.animate-conveyor {
+  animation: conveyorMove 1s linear infinite;
+}
+
+/* Vehicle entrance / exit transition animations */
+@keyframes vehicleDriveIn {
+  0% {
+    opacity: 0;
+    transform: translateX(-240px) scale(0.92);
+    filter: blur(4px);
+  }
+
+  70% {
+    opacity: 1;
+    transform: translateX(5px) scale(1);
+    filter: blur(0px);
+  }
+
+  82% {
+    transform: translateX(-2px) translateY(2px) scale(0.995);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateX(0) translateY(0) scale(1);
+    filter: blur(0px);
+  }
+}
+
+@keyframes vehicleDriveOut {
+  0% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+    filter: blur(0px);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateX(240px) scale(0.92);
+    filter: blur(4px);
+  }
+}
+
+.animate-vehicle-in {
+  animation: vehicleDriveIn 0.85s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-vehicle-out {
+  animation: vehicleDriveOut 0.65s cubic-bezier(0.7, 0, 0.84, 0) forwards;
+}
+
+/* Soap bubbles floating upward */
+@keyframes bubbleFloat {
+  0% {
+    transform: translateY(0) translateX(0) scale(1);
+    opacity: 0;
+  }
+
+  10% {
+    opacity: 0.5;
+  }
+
+  50% {
+    transform: translateY(-45vh) translateX(25px) scale(1.15);
+    opacity: 0.4;
+  }
+
+  90% {
+    opacity: 0.15;
+  }
+
+  100% {
+    transform: translateY(-90vh) translateX(-15px) scale(0.85);
+    opacity: 0;
+  }
+}
+
+/* Shimmer sweep on button */
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* Radar / Ping sweep for IoT HUD */
+@keyframes hudPing {
+  0% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+
+  100% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+}
+
+.animate-hud-ping {
+  animation: hudPing 2s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+/* Glassmorphic border shimmer */
+.glass-panel-glow {
+  background: rgba(8, 14, 28, 0.52);
+  backdrop-filter: blur(28px) saturate(180%);
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow:
+    0 20px 50px rgba(0, 0, 0, 0.6),
+    0 0 30px rgba(0, 180, 216, 0.08),
+    0 0 80px rgba(0, 180, 216, 0.05);
+}
+
+/* ===== LOGIN PAGE — COIN-OP VENDING MACHINE PANEL ===== */
+
+/* Mobile & Low-End Device Performance Optimization */
+.perspective-stage,
+.qw-vendo-body,
+svg {
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  perspective: 1000px;
+}
+
+/* Hyper-realistic Industrial Vendo Chassis */
+.qw-vendo-body {
+  background: linear-gradient(160deg, #1A2844 0%, #0F172A 35%, #0B132B 70%, #050B14 100%);
+  border: 1.5px solid rgba(56, 189, 248, 0.28);
+  box-shadow:
+    0 30px 70px rgba(0, 0, 0, 0.85),
+    0 0 50px rgba(0, 180, 216, 0.12),
+    inset 0 1px 1px rgba(255, 255, 255, 0.15),
+    inset 0 -3px 8px rgba(0, 0, 0, 0.7);
+}
+
+.qw-coin-slot {
+  background: linear-gradient(180deg, #1E293B, #0F172A);
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.6), 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+
+.qw-slot-bezel {
+  background: linear-gradient(135deg, #64748B, #334155, #1E293B);
+  border: 1px solid #94A3B8;
+  box-shadow: inset 0 2px 4px rgba(255, 255, 255, 0.4), inset 0 -2px 6px rgba(0, 0, 0, 0.8), 0 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+.qw-vendo-body {
+  background: linear-gradient(165deg, #1E2F4E 0%, #0C1428 30%, #0E1A31 68%, #0A1120 100%);
+  border: 1px solid rgba(56, 189, 248, 0.18);
+  box-shadow:
+    0 24px 60px rgba(0, 0, 0, 0.7),
+    0 0 40px rgba(0, 180, 216, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    inset 0 -2px 6px rgba(0, 0, 0, 0.5);
+}
+
+.qw-vendo-sheen {
+  background: linear-gradient(115deg, rgba(255, 255, 255, 0.09) 0%, transparent 22%, transparent 68%, rgba(255, 255, 255, 0.05) 100%);
+}
+
+.qw-rivet {
+  background: radial-gradient(circle at 35% 30%, #64748B, #1E293B 60%, #0F172A);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.35), 0 1px 2px rgba(0, 0, 0, 0.7);
+}
+
+/* Brand plate */
+.qw-brand-plate {
+  background: linear-gradient(180deg, #16263F, #0D1830);
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07);
+}
+
+/* LEDs */
+@keyframes qwLedBlink {
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.2;
+  }
+}
+
+.qw-led {
+  width: 7px;
+  height: 7px;
+  border-radius: 9999px;
+  animation: qwLedBlink 1.4s ease-in-out infinite;
+  flex-shrink: 0;
+}
+
+.qw-led-green {
+  background: #34D399;
+  box-shadow: 0 0 8px #34D399;
+}
+
+.qw-led-amber {
+  background: #FBBF24;
+  box-shadow: 0 0 8px #FBBF24;
+  animation-delay: 0.7s;
+}
+
+.qw-led-red {
+  background: #F87171;
+  box-shadow: 0 0 8px #F87171;
+  animation-delay: 0.35s;
+}
+
+/* Coin slot column */
+.qw-coin-slot {
+  background: linear-gradient(180deg, #233650, #16243E);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), inset 0 -2px 8px rgba(0, 0, 0, 0.4);
+}
+
+.qw-slot-plate {
+  background: linear-gradient(160deg, #7C8BA5 0%, #3E4E68 40%, #28374F 60%, #1A2639 100%);
+  border: 1px solid #55677F;
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.35), inset 0 -2px 4px rgba(0, 0, 0, 0.5);
+}
+
+.qw-slot-opening {
+  width: 44px;
+  height: 9px;
+  border-radius: 5px;
+  background: #020617;
+  border: 1px solid #55677F;
+  box-shadow: inset 0 3px 5px rgba(0, 0, 0, 0.9), 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+/* Coin dropping into the slot */
+@keyframes qwCoinDrop {
+  0% {
+    transform: translateY(-26px) rotate(0deg) scale(0.6);
+    opacity: 0;
+  }
+
+  12% {
+    opacity: 1;
+  }
+
+  85% {
+    transform: translateY(34px) rotate(540deg) scale(1);
+    opacity: 1;
+  }
+
+  100% {
+    transform: translateY(46px) rotate(720deg) scale(0.5);
+    opacity: 0;
+  }
+}
+
+.qw-coin-fall {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  margin-left: -9px;
+  width: 18px;
+  height: 18px;
+  border-radius: 9999px;
+  background: radial-gradient(circle at 35% 30%, #FDE68A, #F59E0B 55%, #B45309);
+  border: 2px solid #B45309;
+  box-shadow: 0 0 12px rgba(245, 158, 11, 0.8);
+  animation: qwCoinDrop 0.75s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  z-index: 30;
+}
+
+/* Credit counter pop */
+@keyframes qwChing {
+  0% {
+    transform: scale(1);
+  }
+
+  35% {
+    transform: scale(1.4);
+    color: #FDE68A;
+    text-shadow: 0 0 14px rgba(245, 158, 11, 0.9);
+  }
+
+  100% {
+    transform: scale(1);
+  }
+}
+
+.qw-credit-pop {
+  animation: qwChing 0.5s ease-out;
+}
+
+/* LCD screen */
+.qw-screen {
+  background: linear-gradient(180deg, #02081A, #041021);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  box-shadow:
+    inset 0 0 26px rgba(0, 180, 216, 0.13),
+    inset 0 2px 8px rgba(0, 0, 0, 0.85),
+    0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.qw-scanlines {
+  background: repeating-linear-gradient(0deg, rgba(0, 180, 216, 0.055) 0 1px, transparent 1px 3px);
+}
+
+/* Machine shake on rejected coin */
+@keyframes qwShake {
+
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+
+  20% {
+    transform: translateX(-10px);
+  }
+
+  40% {
+    transform: translateX(10px);
+  }
+
+  60% {
+    transform: translateX(-7px);
+  }
+
+  80% {
+    transform: translateX(7px);
+  }
+}
+
+.qw-shake {
+  animation: qwShake 0.5s ease-in-out;
+}
+
+/* Arcade buttons */
+.qw-btn-arcade {
+  background: linear-gradient(180deg, #22D3EE 0%, #0891B2 45%, #0E7490 100%);
+  color: #03161D;
+  border: 1px solid #67E8F9;
+  box-shadow:
+    0 6px 0 #075985,
+    0 10px 22px rgba(8, 145, 178, 0.45),
+    inset 0 2px 0 rgba(255, 255, 255, 0.55),
+    inset 0 -3px 6px rgba(0, 0, 0, 0.3);
+  transition: all 0.12s ease-out;
+}
+
+.qw-btn-arcade:hover {
+  filter: brightness(1.1);
+}
+
+.qw-btn-arcade:active {
+  transform: translateY(5px);
+  box-shadow:
+    0 1px 0 #075985,
+    0 4px 10px rgba(8, 145, 178, 0.4),
+    inset 0 2px 0 rgba(255, 255, 255, 0.5),
+    inset 0 -2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.qw-btn-return {
+  background: linear-gradient(180deg, #F87171 0%, #DC2626 45%, #991B1B 100%);
+  color: #2A0A0A;
+  border: 1px solid #FCA5A5;
+  box-shadow:
+    0 6px 0 #7F1D1D,
+    0 10px 22px rgba(220, 38, 38, 0.4),
+    inset 0 2px 0 rgba(255, 255, 255, 0.5),
+    inset 0 -3px 6px rgba(0, 0, 0, 0.3);
+  transition: all 0.12s ease-out;
+}
+
+.qw-btn-return:active {
+  transform: translateY(5px);
+  box-shadow: 0 1px 0 #7F1D1D, 0 4px 10px rgba(220, 38, 38, 0.35), inset 0 2px 0 rgba(255, 255, 255, 0.45);
+}
+
+/* Coin popping out of the return tray */
+@keyframes qwCoinReturn {
+  0% {
+    transform: translateY(8px) scale(0.3);
+    opacity: 0;
+  }
+
+  35% {
+    opacity: 1;
+  }
+
+  100% {
+    transform: translateY(-4px) scale(1);
+    opacity: 1;
+  }
+}
+
+.qw-coin-return {
+  animation: qwCoinReturn 0.65s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+/* Price chips */
+.qw-chip {
+  background: #081126;
+  border: 1px solid #1E3A5F;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+/* Bottom grill */
+.qw-grill {
+  background: repeating-linear-gradient(90deg, #0B1426 0 7px, #16243E 7px 9px);
+  border: 1px solid #1E3A5F;
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.6);
+}
+
+/* LED message ticker */
+@keyframes qwTickerScroll {
+  0% {
+    transform: translateX(100%);
+  }
+
+  100% {
+    transform: translateX(-100%);
+  }
+}
+
+.qw-ticker {
+  background: #010409;
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.85);
+  overflow: hidden;
+}
+
+.qw-ticker-text {
+  display: inline-block;
+  white-space: nowrap;
+  padding-right: 4ch;
+  animation: qwTickerScroll 16s linear infinite;
+}
+
+/* Insert button ready-pulse when form is filled */
+@keyframes qwReadyPulse {
+
+  0%,
+  100% {
+    filter: brightness(1);
+    box-shadow:
+      0 6px 0 #075985,
+      0 10px 22px rgba(8, 145, 178, 0.45),
+      inset 0 2px 0 rgba(255, 255, 255, 0.55),
+      inset 0 -3px 6px rgba(0, 0, 0, 0.3),
+      0 0 16px rgba(34, 211, 238, 0.25);
+  }
+
+  50% {
+    filter: brightness(1.18);
+    box-shadow:
+      0 6px 0 #075985,
+      0 10px 26px rgba(8, 145, 178, 0.6),
+      inset 0 2px 0 rgba(255, 255, 255, 0.55),
+      inset 0 -3px 6px rgba(0, 0, 0, 0.3),
+      0 0 36px rgba(34, 211, 238, 0.65);
+  }
+}
+
+.qw-btn-ready {
+  animation: qwReadyPulse 1.5s ease-in-out infinite;
+}
+
+/* Coin return tray */
+.qw-tray {
+  background: #050B18;
+  border: 1px solid #1E3A5F;
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.55);
+}
+
+.glass-telemetry-card {
+  background: rgba(6, 11, 24, 0.55);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(0, 180, 216, 0.15);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+/* ===== ENHANCED ANIMATIONS FOR REALISTIC REDESIGN ===== */
+
+/* Tire / Wheel rotation — continuous spin synced to gantry motion */
+@keyframes tireRotate {
+  0% {
+    transform: rotate(0deg);
+  }
+
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-tire-spin {
+  animation: tireRotate 2.4s linear infinite;
+  transform-origin: center center;
+  transform-box: fill-box;
+}
+
+/* Headlight idle flicker — subtle brightness pulse */
+@keyframes headlightIdle {
+
+  0%,
+  100% {
+    opacity: 0.85;
+    filter: drop-shadow(0 0 6px rgba(224, 242, 254, 0.6));
+  }
+
+  25% {
+    opacity: 1;
+    filter: drop-shadow(0 0 14px rgba(224, 242, 254, 0.95));
+  }
+
+  50% {
+    opacity: 0.9;
+    filter: drop-shadow(0 0 8px rgba(224, 242, 254, 0.7));
+  }
+
+  75% {
+    opacity: 1;
+    filter: drop-shadow(0 0 12px rgba(224, 242, 254, 0.85));
+  }
+}
+
+.animate-headlight {
+  animation: headlightIdle 3s ease-in-out infinite;
+}
+
+/* Taillight glow */
+@keyframes taillightPulse {
+
+  0%,
+  100% {
+    opacity: 0.8;
+    filter: drop-shadow(0 0 4px rgba(239, 68, 68, 0.5));
+  }
+
+  50% {
+    opacity: 1;
+    filter: drop-shadow(0 0 10px rgba(239, 68, 68, 0.9));
+  }
+}
+
+.animate-taillight {
+  animation: taillightPulse 2s ease-in-out infinite;
+}
+
+/* Water mist cloud drifting with the gantry */
+@keyframes mistDrift {
+  0% {
+    opacity: 0;
+    transform: translateX(0) translateY(0) scale(0.6);
+  }
+
+  20% {
+    opacity: 0.35;
+  }
+
+  60% {
+    opacity: 0.25;
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateX(50px) translateY(-35px) scale(2);
+  }
+}
+
+.animate-mist {
+  animation: mistDrift 3s ease-out infinite;
+  transform-box: fill-box;
+  transform-origin: center center;
+}
+
+/* Splash ripple where spray hits vehicle */
+@keyframes splashRipple {
+  0% {
+    transform: scale(0.3);
+    opacity: 0.9;
+  }
+
+  50% {
+    transform: scale(1.2);
+    opacity: 0.5;
+  }
+
+  100% {
+    transform: scale(1.8);
+    opacity: 0;
+  }
+}
+
+.animate-splash {
+  animation: splashRipple 1.2s ease-out infinite;
+  transform-box: fill-box;
+  transform-origin: center center;
+}
+
+/* Blower air output stream */
+@keyframes blowerAir {
+
+  0%,
+  100% {
+    opacity: 0.4;
+    transform: scaleX(0.95);
+  }
+
+  50% {
+    opacity: 0.7;
+    transform: scaleX(1.08);
+  }
+}
+
+.animate-blower-air {
+  animation: blowerAir 0.35s ease-in-out infinite alternate;
+  transform-box: fill-box;
+  transform-origin: left center;
+}
+
+/* Coin slot hover glow ring */
+@keyframes coinSlotGlow {
+
+  0%,
+  100% {
+    box-shadow: 0 0 8px rgba(0, 180, 216, 0.3), inset 0 3px 5px rgba(0, 0, 0, 0.9);
+  }
+
+  50% {
+    box-shadow: 0 0 18px rgba(0, 180, 216, 0.8), inset 0 3px 5px rgba(0, 0, 0, 0.9);
+  }
+}
+
+.qw-slot-opening-glow {
+  animation: coinSlotGlow 1.5s ease-in-out infinite;
+}
+
+/* Coin acceptor guide LED strip */
+@keyframes coinGuideLed {
+  0% {
+    background-position: 0% 0%;
+  }
+
+  100% {
+    background-position: 0% 200%;
+  }
+}
+
+.qw-coin-guide-led {
+  background: repeating-linear-gradient(180deg,
+      rgba(0, 180, 216, 0.7) 0px,
+      rgba(0, 180, 216, 0.7) 3px,
+      transparent 3px,
+      transparent 7px);
+  background-size: 100% 50%;
+  animation: coinGuideLed 0.8s linear infinite;
+}
+
+/* Odometer-style credit digit roll */
+@keyframes odometerRoll {
+  0% {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+
+  30% {
+    opacity: 1;
+  }
+
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.qw-credit-odometer {
+  animation: odometerRoll 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  display: inline-block;
+}
+
+/* Enhanced coin slot plate — chrome 3D bevel */
+.qw-slot-plate-3d {
+  background: linear-gradient(160deg, #9CA8BB 0%, #6B7B93 15%, #4A5B73 35%, #3E4E68 55%, #28374F 75%, #1A2639 100%);
+  border: 2px solid #7C8BA5;
+  box-shadow:
+    inset 0 2px 3px rgba(255, 255, 255, 0.45),
+    inset 0 -3px 5px rgba(0, 0, 0, 0.55),
+    0 4px 12px rgba(0, 0, 0, 0.6),
+    0 1px 0 rgba(255, 255, 255, 0.15);
+  position: relative;
+}
+
+/* Drag chain (energy chain) animation along gantry */
+@keyframes dragChainMove {
+  0% {
+    stroke-dashoffset: 0;
+  }
+
+  100% {
+    stroke-dashoffset: -40;
+  }
+}
+
+.animate-drag-chain {
+  animation: dragChainMove 1.2s linear infinite;
+}
+
+/* Infrared sensor sweep pulse */
+@keyframes irSensorPulse {
+
+  0%,
+  100% {
+    fill: #EF4444;
+    opacity: 0.6;
+    filter: none;
+  }
+
+  50% {
+    fill: #F87171;
+    opacity: 1;
+    filter: drop-shadow(0 0 4px rgba(239, 68, 68, 0.8));
+  }
+}
+
+.animate-ir-sensor {
+  animation: irSensorPulse 1s ease-in-out infinite;
+}
+
+/* Nozzle spray oscillation */
+@keyframes nozzleSpray {
+
+  0%,
+  100% {
+    transform: scaleY(0.92) scaleX(0.96);
+  }
+
+  50% {
+    transform: scaleY(1.06) scaleX(1.04);
+  }
+}
+
+.animate-nozzle-spray {
+  animation: nozzleSpray 0.3s ease-in-out infinite alternate;
+  transform-box: fill-box;
+  transform-origin: top center;
+}
+
+/* ===== LOGIN SCENE ENHANCEMENTS (machine / vehicles / polish) ===== */
+
+/* Mist trail drifting behind the travelling gantry */
+@keyframes mistDrift {
+  0% {
+    transform: translateX(0) translateY(0) scale(0.8);
+    opacity: 0;
+  }
+
+  25% {
+    opacity: 0.4;
+  }
+
+  100% {
+    transform: translateX(-70px) translateY(-14px) scale(1.9);
+    opacity: 0;
+  }
+}
+
+.animate-mist {
+  animation: mistDrift 2.8s ease-out infinite;
+  transform-box: fill-box;
+  transform-origin: center center;
+}
+
+/* Exhaust puffs from the vehicle as it drives in / out */
+@keyframes exhaustPuff {
+  0% {
+    transform: translateX(0) scale(0.4);
+    opacity: 0;
+  }
+
+  15% {
+    opacity: 0.55;
+  }
+
+  100% {
+    transform: translateX(-46px) scale(2.2);
+    opacity: 0;
+  }
+}
+
+.animate-exhaust {
+  animation: exhaustPuff 1.6s ease-out infinite;
+  transform-box: fill-box;
+  transform-origin: center center;
+}
+
+/* Sparkle glints on the freshly washed bodywork */
+@keyframes sparkleTwinkle {
+  0%,
+  100% {
+    transform: scale(0) rotate(0deg);
+    opacity: 0;
+  }
+
+  50% {
+    transform: scale(1) rotate(90deg);
+    opacity: 1;
+  }
+}
+
+.animate-sparkle {
+  animation: sparkleTwinkle 1.8s ease-in-out infinite;
+  transform-box: fill-box;
+  transform-origin: center center;
+}
+
+/* Shine bar sweeping across the clean vehicle body */
+@keyframes shineSweep {
+  0% {
+    transform: translateX(-140px) skewX(-18deg);
+    opacity: 0;
+  }
+
+  20% {
+    opacity: 0.75;
+  }
+
+  60% {
+    opacity: 0.5;
+  }
+
+  100% {
+    transform: translateX(150px) skewX(-18deg);
+    opacity: 0;
+  }
+}
+
+.animate-shine-sweep {
+  animation: shineSweep 3.4s ease-in-out infinite;
+  transform-box: fill-box;
+}
+
+/* Water drip beads falling from the vehicle underbody */
+@keyframes dripBead {
+  0% {
+    transform: translateY(0);
+    opacity: 0;
+  }
+
+  15% {
+    opacity: 0.8;
+  }
+
+  100% {
+    transform: translateY(38px);
+    opacity: 0;
+  }
+}
+
+.animate-drip {
+  animation: dripBead 1.7s ease-in infinite;
+  transform-box: fill-box;
+}
+
+/* Wet-floor light reflection tracking the gantry (same 8s cycle) */
+@keyframes reflectionSweep {
+  0% {
+    transform: translateX(-460px);
+    opacity: 0.2;
+  }
+
+  50% {
+    transform: translateX(460px);
+    opacity: 0.5;
+  }
+
+  100% {
+    transform: translateX(-460px);
+    opacity: 0.2;
+  }
+}
+
+.animate-reflection-sweep {
+  animation: reflectionSweep 8s ease-in-out infinite;
+  transform-box: fill-box;
+}
+
+/* LCD error glitch shake on the vending-machine screen */
+@keyframes lcdGlitch {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+
+  20% {
+    transform: translateX(-3px);
+  }
+
+  40% {
+    transform: translateX(3px);
+  }
+
+  60% {
+    transform: translateX(-2px);
+  }
+
+  80% {
+    transform: translateX(2px);
+  }
+}
+
+.qw-lcd-error {
+  animation: lcdGlitch 0.4s ease-in-out;
+}
+
+/* Coin slot flash burst when a coin is dropped */
+@keyframes slotFlash {
+  0% {
+    box-shadow: 0 0 0 rgba(253, 224, 71, 0);
+  }
+
+  30% {
+    box-shadow: 0 0 26px rgba(253, 224, 71, 0.9);
+  }
+
+  100% {
+    box-shadow: 0 0 8px rgba(0, 180, 216, 0.3), inset 0 3px 5px rgba(0, 0, 0, 0.9);
+  }
+}
+
+.qw-slot-flash {
+  animation: slotFlash 0.9s ease-out;
+}
