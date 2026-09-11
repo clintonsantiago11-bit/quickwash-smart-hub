@@ -384,3 +384,46 @@
   .lw-coin, .lw-vfd { animation: none !important; }
   .lw-vendo, .lw-slot-line { transition: none !important; }
 }
+
+/* ============================================================
+   LOGIN — motion edition: caustics, sheen, field states, LEDs
+   ============================================================ */
+.login-caustics {
+  position: absolute; inset: -10%;
+  background:
+    radial-gradient(38% 22% at 22% 68%, rgba(56, 189, 248, 0.1), transparent 70%),
+    radial-gradient(30% 20% at 78% 30%, rgba(45, 212, 191, 0.08), transparent 70%);
+  filter: blur(30px);
+  animation: lw-caustics 9s ease-in-out infinite alternate;
+}
+@keyframes lw-caustics {
+  from { transform: translate3d(-2%, 1%, 0) scale(1); opacity: 0.8; }
+  to { transform: translate3d(2%, -1%, 0) scale(1.06); opacity: 1; }
+}
+.lw-sheen {
+  position: absolute; inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  background: linear-gradient(100deg, transparent 42%, rgba(255, 255, 255, 0.09) 50%, transparent 58%);
+  background-size: 250% 100%;
+  background-position: 120% 0;
+  transition: background-position 1s ease, opacity 0.3s ease;
+}
+.login-card:hover .lw-sheen { opacity: 1; background-position: -120% 0; }
+.login-field-invalid .login-input { border-color: rgba(248, 113, 113, 0.55); box-shadow: 0 0 0 3px rgba(248, 113, 113, 0.12); }
+.login-field-invalid .login-field-icon { color: #f87171; }
+.login-field-message { font-size: 12px; color: #fca5a5; padding-left: 2px; }
+.login-card-shake { animation: lw-shake 0.4s cubic-bezier(0.36, 0.07, 0.19, 0.97) both; }
+@keyframes lw-shake {
+  10%, 90% { transform: translateX(-1px); }
+  20%, 80% { transform: translateX(2px); }
+  30%, 50%, 70% { transform: translateX(-3px); }
+  40%, 60% { transform: translateX(3px); }
+}
+.lw-led { width: 6px; height: 6px; border-radius: 9999px; box-shadow: 0 0 8px currentColor; }
+
+@media (prefers-reduced-motion: reduce) {
+  .login-caustics, .login-card-shake { animation: none !important; }
+  .login-card:hover .lw-sheen { background-position: 120% 0; opacity: 0; }
+}
