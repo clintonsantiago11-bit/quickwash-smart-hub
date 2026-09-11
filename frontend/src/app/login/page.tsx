@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import {
   AlertCircle,
   ArrowRight,
+  Coins,
   Droplets,
   Eye,
   EyeOff,
@@ -16,12 +17,16 @@ import {
 import { api } from '@/lib/api';
 
 /* ================================================================== */
-/*  LOGIN — "Still Water"                                             */
-/*  One glass instrument panel on calm deep water. No machines,       */
-/*  no vehicles, no coin gimmicks — instant, focused authentication.  */
+/*  LOGIN — "Still Water Vendo"                                       */
+/*  A glass instrument panel on calm deep water, with the real        */
+/*  vendo coin rail on top: insert coin → authenticate → enter.       */
+/*  No gantry machine, no vehicles — just the terminal.               */
 /* ================================================================== */
 
 const APP_VERSION = 'QWS v2.5.0';
+const CREDIT_PER_INSERT = 20;
+/** Coin drop beat before the API call (ms) — kept short on purpose. */
+const COIN_DROP_MS = 420;
 
 export default function LoginPage() {
   const router = useRouter();
@@ -32,6 +37,8 @@ export default function LoginPage() {
   const [rememberMe, setRememberMe] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [credits, setCredits] = useState(0);
+  const [coinDropping, setCoinDropping] = useState(false);
   const [welcomeName, setWelcomeName] = useState<string | null>(null);
 
   // Restore the remembered operator email (client only, post-hydration,
@@ -46,28 +53,37 @@ export default function LoginPage() {
   }, []);
 
   const canSubmit = email.includes('@') && password.trim().length > 0;
+  const busy = isLoading || coinDropping || Boolean(welcomeName);
 
   const handleLogin = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (isLoading || welcomeName) return;
+    if (busy) return;
     setError('');
 
-    try {
-      const auth = await api.login(email.trim(), password);
-      if (rememberMe) localStorage.setItem('remembered_email', email.trim());
-      else localStorage.removeItem('remembered_email');
+    // Drop the coin first, then let the terminal process the sign-in.
+    setCoinDropping(true);
+    setTimeout(async () => {
+      setCoinDropping(false);
+      setCredits((c) => c + CREDIT_PER_INSERT);
+      setIsLoading(true);
 
-      const name: string =
-        auth?.user?.full_name || auth?.user?.username || 'Operator';
-      setWelcomeName(name);
-      // One short beat so the success state registers, then hand off.
-      setTimeout(() => router.push('/'), 700);
-    } catch {
-      setError(
-        'Incorrect email or password. Check your credentials and try again.'
-      );
-      setIsLoading(false);
-    }
+      try {
+        const auth = await api.login(email.trim(), password);
+        if (rememberMe) localStorage.setItem('remembered_email', email.trim());
+        else localStorage.removeItem('remembered_email');
+
+        const name: string =
+          auth?.user?.full_name || auth?.user?.username || 'Operator';
+        setWelcomeName(name);
+        // One beat so "ACCEPTED" registers on the meter, then hand off.
+        setTimeout(() => router.push('/'), 900);
+      } catch {
+        setError(
+          'Invalid coin — rejected. Incorrect email or password; the coin was returned below.'
+        );
+        setIsLoading(false);
+      }
+    }, COIN_DROP_MS);
   };
 
   return (
@@ -81,9 +97,9 @@ export default function LoginPage() {
         <div className="login-vignette" />
       </div>
 
-      {/* ── The instrument panel ────────────────────────────────── */}
+      {/* ── The vendo terminal panel ────────────────────────────── */}
       <main
-        className={`login-card relative z-10 w-full max-w-[420px] rounded-3xl p-7 sm:p-9 ${
+        className={`login-card relative z-10 w-full max-w-[440px] rounded-3xl p-7 sm:p-8 ${
           welcomeName ? 'login-card-success' : ''
         }`}
       >
@@ -96,30 +112,59 @@ export default function LoginPage() {
             <p className="login-brand-name">
               Quick<span className="login-brand-accent">Wash</span>
             </p>
-            <p className="login-brand-sub">SMART HUB CONTROL</p>
+            <p className="login-brand-sub">VENDO TERMINAL</p>
           </div>
           <span className="ml-auto shrink-0 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 font-mono text-[10px] font-semibold tracking-[0.14em] text-slate-400">
             {APP_VERSION}
           </span>
         </div>
 
+        {/* Coin rail: slot + credit meter */}
+        <div
+          className={`lw-vendo ${coinDropping ? 'lw-vendo-active' : ''} ${
+            welcomeName ? 'lw-vendo-accepted' : ''
+          }`}
+        >
+          <div className="lw-slot">
+            <div className="lw-slot-line" />
+            <div className="flex items-center justify-between">
+              <span className="lw-slot-label">INSERT COIN</span>
+              <div className="lw-chips" aria-hidden>
+                <span className="lw-chip">₱5</span>
+                <span className="lw-chip">₱10</span>
+                <span className="lw-chip">₱20</span>
+              </div>
+            </div>
+          </div>
+          <div className="lw-meter" aria-label={`Credits inserted: ${credits}`}>
+            <span key={credits} className="lw-vfd">
+              ₱{credits}
+            </span>
+            <span className="lw-meter-label">CREDIT</span>
+          </div>
+          {coinDropping && <span className="lw-coin" aria-hidden />}
+        </div>
         {/* Heading */}
-        <div className="mt-8">
+        <div className="mt-7">
           <h1 className="login-title">Operator Sign In</h1>
           <p className="login-subtitle">
-            Authenticate to access the car wash control room.
+            Insert your credentials to start the wash.
           </p>
         </div>
-        {/* Error */}
+
+        {/* Error — coin rejected */}
         {error && (
-          <div role="alert" className="login-error mt-5 flex items-start gap-2.5">
+          <div
+            role="alert"
+            className="lw-lcd-error mt-5 flex items-start gap-2.5"
+          >
             <AlertCircle size={15} className="mt-0.5 shrink-0" />
             <p className="text-[13px] leading-snug">{error}</p>
           </div>
         )}
 
         {/* Form */}
-        <form onSubmit={handleLogin} noValidate className="mt-6 space-y-4">
+        <form onSubmit={handleLogin} noValidate className="mt-5 space-y-4">
           <div className="space-y-1.5">
             <label htmlFor="login-email" className="login-label">
               Email
@@ -186,32 +231,33 @@ export default function LoginPage() {
               type="checkbox"
               checked={rememberMe}
               onChange={(e) => setRememberMe(e.target.checked)}
-              className="login-checkbox"
+              className="lw-checkbox login-checkbox"
             />
             <span className="text-[13px] text-slate-400">
               Remember this operator
             </span>
           </label>
 
-          {/* Submit */}
+          {/* Submit — the vendo coin button */}
           <button
             type="submit"
-            disabled={!canSubmit || isLoading || Boolean(welcomeName)}
+            disabled={!canSubmit || busy}
             className="login-btn group mt-2 w-full"
           >
             {isLoading ? (
               <>
                 <Loader2 size={17} className="login-spinner" />
-                <span>Authenticating…</span>
+                <span>Processing coin…</span>
               </>
             ) : welcomeName ? (
               <>
                 <ShieldCheck size={17} />
-                <span>Welcome, {welcomeName}</span>
+                <span>Accepted — Welcome, {welcomeName}</span>
               </>
             ) : (
               <>
-                <span>Sign in to the hub</span>
+                <Coins size={17} />
+                <span>Insert coin &amp; sign in</span>
                 <ArrowRight
                   size={17}
                   className="transition-transform duration-200 group-hover:translate-x-0.5"
