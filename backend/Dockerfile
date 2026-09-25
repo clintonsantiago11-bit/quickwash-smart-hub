@@ -15,8 +15,10 @@ RUN composer install \
 # ---------- Stage 2: runtime ----------
 FROM php:8.2-apache
 
-# pdo_mysql for the app; opcache for request throughput.
-RUN docker-php-ext-install pdo_mysql opcache \
+# Install ca-certificates for secure cloud DB SSL connections; pdo_mysql for the app; opcache for request throughput.
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates \
+    && rm -rf /var/lib/apt/lists/* \
+    && docker-php-ext-install pdo_mysql opcache \
     && a2enmod rewrite headers
 
 ENV APACHE_DOCUMENT_ROOT=/var/www/html/public
