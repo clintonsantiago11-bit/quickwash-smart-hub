@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { test } from 'node:test';
 
 const source = (relativePath) => readFileSync(new URL(relativePath, import.meta.url), 'utf8');
@@ -32,18 +32,24 @@ test('login uses plain product copy without fake coin-terminal language', () => 
   }
 });
 
-test('QuickWash mark is shared by login, sidebar, and browser icon', () => {
+test('QuickWash branding uses the supplied PNG without SVG wrappers', () => {
   const mark = source('../components/QuickWashMark.tsx');
   const page = source('../app/login/page.tsx');
   const sidebar = source('../components/Sidebar.tsx');
-  const icon = source('../app/icon.svg');
+  const appRoot = new URL('../app/', import.meta.url);
+  const publicRoot = new URL('../../public/', import.meta.url);
 
-  assert.match(mark, /QuickWash/);
-  assert.match(mark, /<svg/);
+  assert.match(mark, /import Image from 'next\/image'/);
+  assert.match(mark, /src="\/vendologo\.png"/);
+  assert.match(mark, /alt=\{title\}/);
+  assert.doesNotMatch(mark, /<svg|data:image|<image/);
   assert.match(page, /<QuickWashMark/);
   assert.match(sidebar, /<QuickWashMark/);
-  assert.doesNotMatch(sidebar, /Droplets/);
-  assert.match(icon, /QuickWash/);
-  assert.match(icon, /<svg/);
-  assert.doesNotMatch(icon, /qw-drop/);
+  assert.ok(existsSync(new URL('vendologo.png', publicRoot)));
+  assert.ok(existsSync(new URL('icon.png', appRoot)));
+  assert.ok(existsSync(new URL('apple-icon.png', appRoot)));
+  assert.ok(!existsSync(new URL('icon.svg', appRoot)));
+  assert.ok(!existsSync(new URL('favicon.ico', appRoot)));
+  assert.ok(!existsSync(new URL('favicon.ico', publicRoot)));
+  assert.ok(!existsSync(new URL('icon.svg', publicRoot)));
 });
