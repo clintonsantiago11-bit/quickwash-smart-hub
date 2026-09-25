@@ -13,6 +13,11 @@ test('login uses plain product copy without fake coin-terminal language', () => 
   }
 
   const loginUi = `${page}\n${form}`;
+  assert.match(form, /isSubmitting/);
+  assert.match(form, /login-spinner/);
+  assert.match(form, /login-coin-slot/);
+  assert.match(form, /isSubmitting &&/);
+  assert.match(form, /Verifying account/);
   assert.doesNotMatch(loginUi, />\s*valid\s*</, 'unexpected login copy: valid');
   for (const removed of [
     'Operator Email',
@@ -27,7 +32,7 @@ test('login uses plain product copy without fake coin-terminal language', () => 
   }
 });
 
-test('QuickWash Q mark is shared by login, sidebar, and browser icon', () => {
+test('QuickWash mark is shared by login, sidebar, and browser icon', () => {
   const mark = source('../components/QuickWashMark.tsx');
   const page = source('../app/login/page.tsx');
   const sidebar = source('../components/Sidebar.tsx');
@@ -38,6 +43,7 @@ test('QuickWash Q mark is shared by login, sidebar, and browser icon', () => {
   assert.match(page, /<QuickWashMark/);
   assert.match(sidebar, /<QuickWashMark/);
   assert.doesNotMatch(sidebar, /Droplets/);
-  assert.match(icon, /QW-Q-MARK/);
+  assert.match(icon, /QuickWash/);
+  assert.match(icon, /<svg/);
   assert.doesNotMatch(icon, /qw-drop/);
 });

@@ -71,6 +71,19 @@ export default function CredentialForm({
         </div>
       )}
 
+      {isSubmitting && (
+        <div className="login-coin-slot" role="status" aria-live="polite" aria-label="Verifying account">
+          <div className="login-coin-slot-track" aria-hidden="true">
+            <span className="login-coin-token" />
+            <span className="login-coin-light" />
+          </div>
+          <div>
+            <p className="login-verify-title">Verifying account</p>
+            <p className="login-verify-message">Checking your details securely.</p>
+          </div>
+        </div>
+      )}
+
       <div className="login-field-group">
         <label htmlFor="login-email" className="login-label">Email</label>
         <div className={`login-field ${errFor('email') ? 'login-field-invalid' : ''}`}>
