@@ -1,4 +1,6 @@
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+const DEFAULT_REQUEST_TIMEOUT_MS = 15_000;
+const LOGIN_REQUEST_TIMEOUT_MS = 75_000; // Render free instances can take 50s+ to wake.
 
 // Session marker cookie. The REAL auth is the Bearer token in localStorage;
 // this cookie only feeds the server-side UX gate (src/middleware.ts + the
@@ -58,7 +60,7 @@ class ApiClient {
   private async request(
     path: string,
     options: RequestInit = {},
-    opts: { skipAuthRedirect?: boolean } = {}
+    opts: { skipAuthRedirect?: boolean; timeoutMs?: number } = {}
   ) {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
@@ -71,7 +73,7 @@ class ApiClient {
     }
 
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 15000);
+    const timer = setTimeout(() => controller.abort(), opts.timeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS);
 
     let res: Response;
     try {
@@ -131,7 +133,7 @@ class ApiClient {
     return this.request(path);
   }
 
-  post(path: string, data?: Record<string, unknown>, opts: { skipAuthRedirect?: boolean } = {}) {
+  post(path: string, data?: Record<string, unknown>, opts: { skipAuthRedirect?: boolean; timeoutMs?: number } = {}) {
     return this.request(path, {
       method: 'POST',
       body: data ? JSON.stringify(data) : undefined,
@@ -155,7 +157,11 @@ class ApiClient {
   // Auth
   async login(email: string, password: string) {
     try {
-      const data = await this.post('/auth/login', { email, password }, { skipAuthRedirect: true });
+      const data = await this.post(
+        '/auth/login',
+        { email, password },
+        { skipAuthRedirect: true, timeoutMs: LOGIN_REQUEST_TIMEOUT_MS }
+      );
       this.setToken(data.token);
       localStorage.setItem('isAuthenticated', 'true');
       setSessionCookie();

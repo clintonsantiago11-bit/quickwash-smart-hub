@@ -22,6 +22,14 @@ Check-Step 'Backend tests (PHPUnit)' {
     Pop-Location
 }
 
+# --- Frontend: tests (Node built-in test runner; no extra dependency) ---
+Check-Step 'Frontend tests (node:test)' {
+    Push-Location "$root\frontend"
+    & npm test
+    if ($LASTEXITCODE -ne 0) { $script:failed = $true }
+    Pop-Location
+}
+
 # --- Frontend: TypeScript type check ---
 Check-Step 'Frontend type check (tsc --noEmit)' {
     Push-Location "$root\frontend"
