@@ -3,7 +3,7 @@ interface QuickWashMarkProps {
   title?: string;
 }
 
-/** QuickWash's geometric Q: a wash-cycle ring with a water-line cutout. */
+/** QuickWash's water-and-soap mark: a droplet carrying two clean bubbles. */
 export default function QuickWashMark({ className, title }: QuickWashMarkProps) {
   return (
     <svg
@@ -17,19 +17,22 @@ export default function QuickWashMark({ className, title }: QuickWashMarkProps) 
       {title ? <title>{title}</title> : null}
       <rect x="3" y="3" width="42" height="42" rx="13" fill="#0C1929" stroke="#22D3EE" strokeWidth="2" />
       <path
-        d="M31.5 14.5a12 12 0 1 0 3.1 18.1"
+        d="M24 8.5C24 8.5 12.5 21.2 12.5 29.2a11.5 11.5 0 0 0 23 0C35.5 21.2 24 8.5 24 8.5Z"
+        fill="#22D3EE"
+        fillOpacity="0.12"
+        stroke="#F8FAFC"
+        strokeWidth="2.6"
+        strokeLinejoin="round"
+      />
+      <circle cx="27.4" cy="29.3" r="5.1" fill="#0C1929" fillOpacity="0.72" stroke="#22D3EE" strokeWidth="2" />
+      <circle cx="20.5" cy="25.3" r="2.1" fill="#67E8F9" />
+      <path
+        d="M20.5 18.5c-1.7 2.1-2.9 4.2-3.5 5.8"
         fill="none"
         stroke="#F8FAFC"
-        strokeWidth="5"
+        strokeWidth="1.8"
         strokeLinecap="round"
-      />
-      <path d="m29 29 9 9" fill="none" stroke="#22D3EE" strokeWidth="5" strokeLinecap="round" />
-      <path
-        d="M15 26c3.3-2.7 5.2 2.7 8.5 0s5.2 2.7 8.5 0"
-        fill="none"
-        stroke="#67E8F9"
-        strokeWidth="2.4"
-        strokeLinecap="round"
+        opacity="0.8"
       />
     </svg>
   );
