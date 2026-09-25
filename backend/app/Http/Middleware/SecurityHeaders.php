@@ -25,6 +25,14 @@ class SecurityHeaders
         $response->headers->set('Referrer-Policy', 'strict-origin-when-cross-origin');
         $response->headers->set('Permissions-Policy', 'camera=(self), microphone=(), geolocation=()');
 
+        $origin = $request->header('Origin');
+        if ($origin && (preg_match('/^https:\/\/.*\.vercel\.app$/', $origin) || preg_match('/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/', $origin))) {
+            $response->headers->set('Access-Control-Allow-Origin', $origin);
+            $response->headers->set('Access-Control-Allow-Credentials', 'true');
+            $response->headers->set('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+            $response->headers->set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
+        }
+
         if ($isProd) {
             $response->headers->set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
         }

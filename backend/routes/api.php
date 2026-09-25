@@ -11,6 +11,10 @@ use App\Http\Controllers\Api\AuditController;
 use App\Http\Controllers\Api\NaekIngestController;
 use App\Http\Controllers\Api\NaekConfigController;
 
+Route::options('/{any}', function () {
+    return response('', 200);
+})->where('any', '.*');
+
 Route::post('/auth/login', [AuthController::class, 'login'])->middleware('throttle:10,1');
 Route::post('/auth/logout', [AuthController::class, 'logout'])->middleware('auth:sanctum');
 Route::get('/auth/user', [AuthController::class, 'user'])->middleware('auth:sanctum');
