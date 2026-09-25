@@ -13,11 +13,7 @@ test('login uses plain product copy without fake coin-terminal language', () => 
   }
 
   const loginUi = `${page}\n${form}`;
-  assert.match(form, /isSubmitting/);
-  assert.match(form, /login-spinner/);
-  assert.match(form, /login-coin-slot/);
-  assert.match(form, /isSubmitting &&/);
-  assert.match(form, /Verifying account/);
+  assert.match(form, /phase/);
   assert.doesNotMatch(loginUi, />\s*valid\s*</, 'unexpected login copy: valid');
   for (const removed of [
     'Operator Email',
@@ -30,6 +26,35 @@ test('login uses plain product copy without fake coin-terminal language', () => 
   ]) {
     assert.doesNotMatch(loginUi, new RegExp(removed.replace('?', '\\?')), `unexpected login copy: ${removed}`);
   }
+});
+
+test('coin-slot feedback maps credential attempts to insert, authenticate, jam, and accept states', () => {
+  const auth = source('./auth.ts');
+  const page = source('../app/login/page.tsx');
+  const form = source('../components/login/CredentialForm.tsx');
+  const feedback = source('../components/login/CoinSlotFeedback.tsx');
+  const styles = source('../app/globals.css');
+  const loginFeedback = `${form}\n${feedback}`;
+
+  for (const phase of ['inserting', 'authenticating', 'jam', 'success', 'error']) {
+    assert.match(auth, new RegExp(`['"]${phase}['"]`));
+  }
+
+  assert.match(page, /setPhase\('inserting'\)/);
+  assert.match(page, /setPhase\('authenticating'\)/);
+  assert.match(page, /kind === 'credentials' \? 'jam' : 'error'/);
+  assert.match(form, /CoinSlotFeedback/);
+  assert.match(form, /phase=\{phase\}/);
+  assert.doesNotMatch(form, /login-spinner/);
+
+  for (const copy of ['Inserting credential', 'Authenticating', 'Coin jammed', 'Coin accepted', 'Sign-in unavailable']) {
+    assert.match(loginFeedback, new RegExp(copy));
+  }
+
+  for (const animation of ['login-coin-drop', 'login-coin-scan', 'login-coin-jam']) {
+    assert.match(styles, new RegExp(animation));
+  }
+  assert.match(styles, /prefers-reduced-motion/);
 });
 
 test('QuickWash branding uses the supplied PNG without SVG wrappers', () => {

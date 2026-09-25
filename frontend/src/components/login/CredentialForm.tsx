@@ -1,14 +1,15 @@
 'use client';
 
-import { Eye, EyeOff, LoaderCircle, LockKeyhole, Mail, RotateCcw } from 'lucide-react';
+import { Eye, EyeOff, LockKeyhole, Mail, RotateCcw } from 'lucide-react';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import type { FieldError } from '@/lib/auth';
+import CoinSlotFeedback from '@/components/login/CoinSlotFeedback';
+import type { FieldError, LoginCredentials, LoginPhase } from '@/lib/auth';
 
 interface CredentialFormProps {
-  onSubmit: (data: { email: string; password: string; rememberMe: boolean }) => FieldError | null;
+  onSubmit: (data: LoginCredentials) => FieldError | null;
   fieldError: FieldError | null;
   serverMessage: string;
-  isSubmitting: boolean;
+  phase: LoginPhase;
   onRetry: () => void;
   onClearError: () => void;
 }
@@ -17,7 +18,7 @@ export default function CredentialForm({
   onSubmit,
   fieldError,
   serverMessage,
-  isSubmitting,
+  phase,
   onRetry,
   onClearError,
 }: CredentialFormProps) {
@@ -25,6 +26,7 @@ export default function CredentialForm({
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
+  const isSubmitting = phase === 'inserting' || phase === 'authenticating';
   const [touched, setTouched] = useState<{ email: boolean; password: boolean }>({
     email: false,
     password: false,
@@ -58,29 +60,18 @@ export default function CredentialForm({
 
   return (
     <form onSubmit={submit} noValidate className="login-form">
+      {phase !== 'idle' && <CoinSlotFeedback phase={phase} />}
+
       {serverMessage && (
         <div className="login-alert login-alert-error" role="alert">
           <div>
-            <p className="login-alert-title">Sign in unsuccessful</p>
+            <p className="login-alert-title">{phase === 'jam' ? 'Credential rejected' : 'Sign in unsuccessful'}</p>
             <p className="login-alert-message">{serverMessage}</p>
           </div>
           <button type="button" className="login-retry" onClick={onRetry} disabled={isSubmitting}>
             <RotateCcw size={15} aria-hidden="true" />
-            Try again
+            {phase === 'jam' ? 'Retry coin' : 'Try again'}
           </button>
-        </div>
-      )}
-
-      {isSubmitting && (
-        <div className="login-coin-slot" role="status" aria-live="polite" aria-label="Verifying account">
-          <div className="login-coin-slot-track" aria-hidden="true">
-            <span className="login-coin-token" />
-            <span className="login-coin-light" />
-          </div>
-          <div>
-            <p className="login-verify-title">Verifying account</p>
-            <p className="login-verify-message">Checking your details securely.</p>
-          </div>
         </div>
       )}
 
@@ -167,14 +158,11 @@ export default function CredentialForm({
       </label>
 
       <button type="submit" className="login-btn" disabled={isSubmitting}>
-        {isSubmitting ? (
-          <>
-            <LoaderCircle className="login-spinner" size={18} aria-hidden="true" />
-            <span>Signing in…</span>
-          </>
-        ) : (
-          <span>Sign in</span>
-        )}
+        {phase === 'inserting'
+          ? 'Inserting…'
+          : phase === 'authenticating'
+            ? 'Authenticating…'
+            : <span>Sign in</span>}
       </button>
     </form>
   );

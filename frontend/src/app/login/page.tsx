@@ -1,9 +1,10 @@
 'use client';
 
-import { CheckCircle2, ShieldCheck } from 'lucide-react';
+import { ShieldCheck } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api, LoginError } from '@/lib/api';
+import CoinSlotFeedback from '@/components/login/CoinSlotFeedback';
 import {
   validateCredentials,
   type AuthResponse,
@@ -14,11 +15,14 @@ import {
 import CredentialForm from '@/components/login/CredentialForm';
 import QuickWashMark from '@/components/QuickWashMark';
 
-const REDIRECT_MS = 700;
+const COIN_INSERT_MS = 520;
+const REDIRECT_MS = 900;
 
 export default function LoginPage() {
   const router = useRouter();
   const redirectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const insertionTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const attemptId = useRef(0);
   const [phase, setPhase] = useState<LoginPhase>('idle');
   const [serverMessage, setServerMessage] = useState('');
   const [fieldError, setFieldError] = useState<FieldError | null>(null);
@@ -26,16 +30,29 @@ export default function LoginPage() {
   const lastAttempt = useRef<LoginCredentials | null>(null);
 
   useEffect(() => () => {
+    attemptId.current += 1;
     if (redirectTimer.current) clearTimeout(redirectTimer.current);
+    if (insertionTimer.current) clearTimeout(insertionTimer.current);
   }, []);
 
   const authenticate = useCallback(async (credentials: LoginCredentials) => {
+    const attempt = ++attemptId.current;
     setFieldError(null);
     setServerMessage('');
-    setPhase('loading');
+    setPhase('inserting');
 
+    await new Promise<void>((resolve) => {
+      insertionTimer.current = setTimeout(() => {
+        insertionTimer.current = null;
+        resolve();
+      }, COIN_INSERT_MS);
+    });
+    if (attempt !== attemptId.current) return;
+
+    setPhase('authenticating');
     try {
       const auth = (await api.login(credentials.email, credentials.password)) as AuthResponse;
+      if (attempt !== attemptId.current) return;
       if (credentials.rememberMe) localStorage.setItem('remembered_email', credentials.email.trim());
       else localStorage.removeItem('remembered_email');
 
@@ -43,6 +60,7 @@ export default function LoginPage() {
       setPhase('success');
       redirectTimer.current = setTimeout(() => router.push('/'), REDIRECT_MS);
     } catch (error) {
+      if (attempt !== attemptId.current) return;
       const kind = error instanceof LoginError ? error.kind : 'server';
       const messages = {
         network: 'QuickWash could not be reached. Check your connection, then try again.',
@@ -51,12 +69,12 @@ export default function LoginPage() {
         server: 'Sign in is temporarily unavailable. Try again in a moment.',
       } as const;
       setServerMessage(messages[kind]);
-      setPhase('error');
+      setPhase(kind === 'credentials' ? 'jam' : 'error');
     }
   }, [router]);
 
   const handleSubmit = useCallback((credentials: LoginCredentials): FieldError | null => {
-    if (phase === 'loading') return null;
+    if (phase !== 'idle' && phase !== 'jam' && phase !== 'error') return null;
 
     const problem = validateCredentials(credentials);
     if (problem) {
@@ -70,13 +88,13 @@ export default function LoginPage() {
   }, [authenticate, phase]);
 
   const handleRetry = useCallback(() => {
-    if (phase === 'loading' || !lastAttempt.current) return;
+    if (phase === 'inserting' || phase === 'authenticating' || !lastAttempt.current) return;
     void authenticate(lastAttempt.current);
   }, [authenticate, phase]);
 
   const clearError = useCallback(() => {
     setFieldError(null);
-    if (phase === 'error') setPhase('idle');
+    if (phase === 'jam' || phase === 'error') setPhase('idle');
     setServerMessage('');
   }, [phase]);
 
@@ -116,11 +134,8 @@ export default function LoginPage() {
             <p className="login-kicker">Operator portal</p>
             {phase === 'success' ? (
               <>
-                <div className="login-success-mark" aria-hidden="true">
-                  <CheckCircle2 size={26} />
-                </div>
                 <h2 id="login-heading">Welcome back</h2>
-                <p>Signed in as {signedInName}. Opening your dashboard…</p>
+                <p>Signed in as {signedInName}.</p>
               </>
             ) : (
               <>
@@ -131,16 +146,13 @@ export default function LoginPage() {
           </div>
 
           {phase === 'success' ? (
-            <div className="login-status login-status-success" role="status" aria-live="polite">
-              <span className="login-status-dot" aria-hidden="true" />
-              Authentication complete
-            </div>
+            <CoinSlotFeedback phase="success" signedInName={signedInName} />
           ) : (
             <CredentialForm
               onSubmit={handleSubmit}
               fieldError={fieldError}
               serverMessage={serverMessage}
-              isSubmitting={phase === 'loading'}
+              phase={phase}
               onRetry={handleRetry}
               onClearError={clearError}
             />

@@ -28,7 +28,7 @@ export interface AuthResponse {
   user: AuthUser;
 }
 
-export type LoginPhase = 'idle' | 'loading' | 'success' | 'error';
+export type LoginPhase = 'idle' | 'inserting' | 'authenticating' | 'success' | 'jam' | 'error';
 
 export type FieldName = 'email' | 'password';
 
