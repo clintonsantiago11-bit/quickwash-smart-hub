@@ -16,7 +16,7 @@ php artisan key:generate --no-interaction || true
 php artisan package:discover --no-interaction || true
 
 # Make sure the schema is current before serving.
-php artisan migrate --force
+php artisan migrate --force || { echo "Migration attempt failed, retrying in 3s..."; sleep 3; php artisan migrate --force; }
 
 # Baseline rows (facility, devices, first admin). Idempotent: the seeder never
 # invents a default password - it applies ADMIN_PASSWORD when set, leaves an
