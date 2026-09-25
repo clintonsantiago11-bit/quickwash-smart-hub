@@ -22,7 +22,7 @@ function clearSessionCookie() {
   document.cookie = `${SESSION_COOKIE}=; path=/; max-age=0`;
 }
 
-/** Typed login failures — lets the coin mech tell jam from return. */
+/** Typed login failures for actionable form feedback. */
 export type LoginErrorKind = 'credentials' | 'network' | 'timeout' | 'server';
 
 export class LoginError extends Error {

@@ -28,19 +28,7 @@ export interface AuthResponse {
   user: AuthUser;
 }
 
-/**
- * Vendo lifecycle:
- *   idle → loading → accepted | jammed | returned → (idle)
- * `loading` mirrors the real network request; `jammed` means the
- * connection failed (no signal / timeout); `returned` means the
- * credentials were rejected. Motion never fakes progress.
- */
-export type CoinPhase = 'idle' | 'loading' | 'accepted' | 'jammed' | 'returned';
-
-export interface VendoSession {
-  credits: number;
-  phase: CoinPhase;
-}
+export type LoginPhase = 'idle' | 'loading' | 'success' | 'error';
 
 export type FieldName = 'email' | 'password';
 
@@ -54,9 +42,9 @@ export function validateCredentials(
   creds: Pick<LoginCredentials, 'email' | 'password'>
 ): FieldError | null {
   const email = creds.email.trim();
-  if (!email) return { field: 'email', message: 'Enter your operator email.' };
+  if (!email) return { field: 'email', message: 'Enter your email.' };
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    return { field: 'email', message: 'That does not look like a valid email.' };
+    return { field: 'email', message: 'Enter a valid email address.' };
   }
   if (!creds.password) return { field: 'password', message: 'Enter your password.' };
   if (creds.password.length < 6) {

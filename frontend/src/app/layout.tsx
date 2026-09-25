@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, JetBrains_Mono, Saira_Condensed } from "next/font/google";
+import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { UIProvider } from "@/providers/UIProvider";
 import LayoutContent from "@/components/LayoutContent";
@@ -13,13 +13,6 @@ const jetbrainsMono = JetBrains_Mono({
   weight: ["400", "500", "600", "700"],
   subsets: ["latin"],
   variable: "--font-mono",
-});
-
-// Industrial signage face — login "BAY 01" stencil + faceplate headings.
-const sairaCondensed = Saira_Condensed({
-  weight: ["500", "600", "700"],
-  subsets: ["latin"],
-  variable: "--font-industrial",
 });
 
 export const metadata: Metadata = {
@@ -40,7 +33,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning className={`${inter.variable} ${jetbrainsMono.variable} ${sairaCondensed.variable} h-full antialiased`}>
+    <html lang="en" suppressHydrationWarning className={`${inter.variable} ${jetbrainsMono.variable} h-full antialiased`}>
       <body className="antialiased" suppressHydrationWarning>
         <UIProvider>
           <LayoutContent>{children}</LayoutContent>

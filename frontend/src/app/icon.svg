@@ -1,18 +1,9 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <defs>
-    <linearGradient id="qw-bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#00B4D8"/>
-      <stop offset="1" stop-color="#0284C7"/>
-    </linearGradient>
-    <linearGradient id="qw-drop" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#FFFFFF"/>
-      <stop offset="1" stop-color="#E0F2FE"/>
-    </linearGradient>
-  </defs>
-  <rect x="3" y="3" width="58" height="58" rx="14" fill="#0B132B"/>
-  <rect x="3" y="3" width="58" height="58" rx="14" fill="none" stroke="#1E3A5F" stroke-width="2"/>
-  <circle cx="32" cy="32" r="22" fill="url(#qw-bg)"/>
-  <path d="M32 17 C 38.5 23.5 43 28.5 43 33.5 C 43 40 38 45 32 45 C 26 45 21 40 21 33.5 C 21 28.5 25.5 23.5 32 17 Z" fill="url(#qw-drop)"/>
-  <ellipse cx="27.5" cy="30" rx="4.5" ry="6.5" fill="#FFFFFF" opacity="0.45" transform="rotate(-18 27.5 30)"/>
-  <circle cx="43.5" cy="21" r="4" fill="#A5F3FC" opacity="0.8"/>
+/* QuickWash Q mark: wash-cycle ring with a water-line cutout. */
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
+  <g id="QW-Q-MARK">
+    <rect x="3" y="3" width="42" height="42" rx="13" fill="#0C1929" stroke="#22D3EE" stroke-width="2"/>
+    <path d="M31.5 14.5a12 12 0 1 0 3.1 18.1" fill="none" stroke="#F8FAFC" stroke-width="5" stroke-linecap="round"/>
+    <path d="m29 29 9 9" fill="none" stroke="#22D3EE" stroke-width="5" stroke-linecap="round"/>
+    <path d="M15 26c3.3-2.7 5.2 2.7 8.5 0s5.2 2.7 8.5 0" fill="none" stroke="#67E8F9" stroke-width="2.4" stroke-linecap="round"/>
+  </g>
 </svg>

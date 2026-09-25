@@ -10,7 +10,6 @@ import {
   Coins,
   Bell,
   Settings,
-  Droplets,
   ChevronLeft,
   ChevronRight,
   History,
@@ -18,6 +17,7 @@ import {
   X
 } from 'lucide-react';
 import { useUI } from '@/providers/UIProvider';
+import QuickWashMark from '@/components/QuickWashMark';
 
 const navItems = [
   { label: 'Dashboard',  href: '/',           icon: LayoutDashboard },
@@ -62,12 +62,7 @@ export default function Sidebar() {
         className="flex items-center gap-3 px-5 h-[72px] shrink-0"
         style={{ borderBottom: '1px solid var(--border)' }}
       >
-        <div
-          className="w-8 h-8 rounded-full flex items-center justify-center shrink-0"
-          style={{ background: 'var(--accent)' }}
-        >
-          <Droplets size={18} className="text-[var(--bg-base)]" strokeWidth={2.5} />
-        </div>
+        <QuickWashMark className="w-9 h-9 shrink-0" title="QuickWash" />
         {(!collapsed || isMobileMenuOpen) && (
           <div className="animate-fade-in flex-1 min-w-0">
             <div
