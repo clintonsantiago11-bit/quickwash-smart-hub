@@ -38,6 +38,14 @@ Check-Step 'Frontend lint (eslint)' {
     Pop-Location
 }
 
+# --- Frontend: production build (what the PaaS actually runs) ---
+Check-Step 'Frontend production build (next build)' {
+    Push-Location "$root\frontend"
+    & npx next build
+    if ($LASTEXITCODE -ne 0) { $script:failed = $true }
+    Pop-Location
+}
+
 Write-Host "`n========================================="
 if ($failed) {
     Write-Host 'GATE: FAILED - fix the issues above.' -ForegroundColor Red

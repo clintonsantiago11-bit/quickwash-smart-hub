@@ -1,9 +1,12 @@
 export const dynamic = 'force-dynamic';
 
 // Proxies the ESP32-CAM MJPEG stream so the browser only ever talks to
-// localhost. This avoids CORS / Brave Shields / Private Network Access
-// restrictions when embedding http://<camera-ip>:81/stream directly.
-const CAMERA_STREAM_URL = 'http://192.168.1.7:81/stream';
+// the app's own origin. This avoids CORS / Brave Shields / Private Network
+// Access restrictions when embedding http://<camera-ip>:81/stream directly.
+// The camera lives on the wash-bay LAN, so the upstream URL is an env var:
+// set CAMERA_STREAM_URL when the frontend runs on the LAN too (cloud hosts
+// cannot reach the LAN IP, so the feed stays "offline" there by design).
+const CAMERA_STREAM_URL = process.env.CAMERA_STREAM_URL || 'http://192.168.1.7:81/stream';
 
 type ActiveStream = {
   abort: () => void;
@@ -36,7 +39,7 @@ if (typeof reaper.unref === 'function') reaper.unref();
 export async function GET(request: Request) {
   // Server-side auth gate (see panel route): the camera feed is private.
   const cookies = request.headers.get('cookie') ?? '';
-  const hasAuth = /(?:^|;\s*)auth_token=[^;]+/.test(cookies);
+  const hasAuth = /(?:^|;\s*)qhs_session=[^;]+/.test(cookies);
   if (!hasAuth) {
     return new Response('Unauthorized', { status: 401 });
   }

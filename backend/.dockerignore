@@ -1,0 +1,25 @@
+.env
+.env.local
+.env.production
+.phpunit.cache/
+*.log
+composer.phar
+/deploy
+/scripts
+/public/build
+vite.config.js
+/node_modules
+/vendor
+
+# Stage 1 installs a clean vendor/ (no dev deps), don't ship the local one.
+!vendor/.gitkeep
+
+storage/logs/*
+storage/framework/cache/*
+storage/framework/sessions/*
+storage/framework/views/*
+!storage/logs/.gitkeep
+!storage/framework/.gitignore
+!storage/framework/cache/.gitignore
+!storage/framework/sessions/.gitignore
+!storage/framework/views/.gitignore

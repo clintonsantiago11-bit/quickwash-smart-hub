@@ -29,11 +29,13 @@ export interface AuthResponse {
 }
 
 /**
- * Vendo coin rail lifecycle:
- *   idle → dropping → processing → accepted | rejected → (idle)
- * `rejected` always returns the coin; `accepted` always clears it.
+ * Vendo lifecycle:
+ *   idle → loading → accepted | jammed | returned → (idle)
+ * `loading` mirrors the real network request; `jammed` means the
+ * connection failed (no signal / timeout); `returned` means the
+ * credentials were rejected. Motion never fakes progress.
  */
-export type CoinPhase = 'idle' | 'dropping' | 'processing' | 'accepted' | 'rejected';
+export type CoinPhase = 'idle' | 'loading' | 'accepted' | 'jammed' | 'returned';
 
 export interface VendoSession {
   credits: number;

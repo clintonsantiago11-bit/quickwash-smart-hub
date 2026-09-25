@@ -4,9 +4,12 @@ import { NextResponse, type NextRequest } from 'next/server';
  * Server-side auth guard for the QuickWash Smart Hub.
  *
  * Redirects unauthenticated requests to /login BEFORE any page renders,
- * preventing a flash of the dashboard on a fresh session. Auth state is
- * carried in the `auth_token` cookie (kept in sync with localStorage by
- * src/lib/api.ts on login / logout / 401).
+ * preventing a flash of the dashboard on a fresh session. This gate is a UX
+ * courtesy — the REAL auth is the Sanctum Bearer token (stored in
+ * localStorage by src/lib/api.ts and sent on every API call). Auth state for
+ * the gate is carried in the `qhs_session` cookie, set by the frontend on its
+ * own origin at login (see src/lib/api.ts), so it works regardless of where
+ * the API is hosted.
  *
  * Public paths (no auth required): /login, all /api/* routes, and static
  * assets.
@@ -25,7 +28,7 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  const token = request.cookies.get('auth_token')?.value;
+  const token = request.cookies.get('qhs_session')?.value;
   if (!token) {
     const url = request.nextUrl.clone();
     url.pathname = '/login';

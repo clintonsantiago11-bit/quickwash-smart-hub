@@ -58,7 +58,7 @@ Route::get('/', function () {
         'status' => 'online',
         'version' => '1.0.0',
         'health' => url('/api/health'),
-        'frontend' => 'http://localhost:3000'
+        'frontend' => config('app.frontend_url')
     ]);
 });
 

@@ -1,36 +1,19 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# QuickWash Smart Hub — dashboard (Next.js)
 
-## Getting Started
-
-First, run the development server:
+Next.js 16 App Router front-end for the QuickWash Smart Hub. Talks to the Laravel
+API (`NEXT_PUBLIC_API_URL`) and, optionally, the Socket.IO edge bridge
+(`NEXT_PUBLIC_WS_URL`).
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm run dev      # http://localhost:3000
+npm run build    # production build (what the PaaS runs)
+npm run start    # serve the production build
+npm run lint     # eslint
+npx tsc --noEmit # type check
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Environment: copy `.env.production.example` for hosted deployments; local dev uses
+`.env.local` (both are gitignored — the `.example` templates are the documentation).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Repo-wide docs: see `../README.md` (architecture, local demo) and `../DEPLOY.md`
+(Railway deployment steps, env vars, health checks).

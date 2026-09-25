@@ -23,8 +23,10 @@ interface HardwareUpdate {
   timestamp?: string;
 }
 
+const CAMERA_CONTROL_URL = process.env.NEXT_PUBLIC_CAMERA_CONTROL_URL || 'http://192.168.1.7/';
+
 const initialCameras: CameraFeed[] = [
-  { id: 'esp32_cam_1', name: 'Main Wash Bay', streamUrl: '/api/camera/stream', controlUrl: 'http://192.168.1.7/', status: 'offline' },
+  { id: 'esp32_cam_1', name: 'Main Wash Bay', streamUrl: '/api/camera/stream', controlUrl: CAMERA_CONTROL_URL, status: 'offline' },
 ];
 
 export default function CamerasPage() {
@@ -223,7 +225,7 @@ export default function CamerasPage() {
                         Surveillance node unreachable. Check the ESP32-CAM power supply (solid 5V/2A), reseat the camera ribbon cable, or open its control panel to verify the sensor.
                       </p>
                       <p className="text-[10px] lg:text-xs mt-2 leading-relaxed font-bold opacity-40" style={{ color: 'var(--text-secondary)' }}>
-                        Target device: http://192.168.1.7 (auto-retrying every 10s)
+                        Target device: {CAMERA_CONTROL_URL} (auto-retrying every 10s)
                       </p>
                     </div>
                   </div>

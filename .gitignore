@@ -2,6 +2,7 @@
 .env
 .env.*
 !.env.example
+!.env.production.example
 
 # --- Node / Next.js ---
 node_modules/
@@ -25,6 +26,7 @@ iotbridge_err.log
 backend/vendor/
 backend/bootstrap/cache/*.php
 backend/storage/*.key
+backend/.phpunit.cache/
 
 # --- DB backups (local dumps) ---
 backups/

@@ -74,6 +74,7 @@ export default function NaekConfigCard() {
 
   useEffect(() => {
     socketService.connect();
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- initial fetch of external socket state, established repo convention
     refresh();
     const interval = setInterval(refresh, 5000);
     const off = socketService.onConnectionChange(setConnected);

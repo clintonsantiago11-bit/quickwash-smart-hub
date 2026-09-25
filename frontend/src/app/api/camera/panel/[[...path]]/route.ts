@@ -6,7 +6,9 @@ export const dynamic = 'force-dynamic';
 // so we rewrite those to app-relative proxy paths:
 //   /status /control /capture /reg /greg /xclk /pll /resolution -> here (port 80)
 //   /stream -> /api/camera/stream (our dedicated MJPEG proxy)
-const CAMERA_HOST = 'http://192.168.1.7';
+// CAMERA_HOST is a LAN address; see the note in stream/route.ts on why cloud
+// deployments can't reach it and leave the feed "offline".
+const CAMERA_HOST = process.env.CAMERA_HOST || 'http://192.168.1.7';
 
 type RouteContext = { params: Promise<{ path?: string[] }> };
 
@@ -15,7 +17,7 @@ export async function GET(request: Request, ctx: RouteContext) {
   // camera proxy must check the session cookie itself. Anyone without a valid
   // session is denied — the live feed is not public.
   const cookies = request.headers.get('cookie') ?? '';
-  const hasAuth = /(?:^|;\s*)auth_token=[^;]+/.test(cookies);
+  const hasAuth = /(?:^|;\s*)qhs_session=[^;]+/.test(cookies);
   if (!hasAuth) {
     return new Response('Unauthorized', { status: 401 });
   }

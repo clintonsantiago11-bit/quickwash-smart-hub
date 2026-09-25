@@ -1,4 +1,14 @@
--- QuickWash Smart Hub - MySQL Database Schema
+-- QuickWash Smart Hub - MySQL Database Schema (LEGACY REFERENCE ONLY)
+-- ---------------------------------------------------------------------------
+-- The deployed schema is created by `php artisan migrate --force`
+-- (see backend/database/migrations). The first admin account is created by
+-- `php artisan db:seed` (backend/database/seeders/DatabaseSeeder.php), which
+-- takes ADMIN_EMAIL/ADMIN_PASSWORD from the environment or generates a random
+-- password - no default credential is shipped.
+--
+-- This file is kept as a human-readable overview and may lag the migrations.
+-- Do NOT import it in production.
+-- ---------------------------------------------------------------------------
 -- Run this in PHPMyAdmin or via MySQL CLI
 
 CREATE DATABASE IF NOT EXISTS quickwash_hub;
@@ -160,9 +170,8 @@ CREATE TABLE `personal_access_tokens` (
 -- Initial Seed Data
 INSERT INTO `facilities` (`id`, `name`) VALUES (1, 'QuickWash Main Facility');
 
--- Default Admin (password: admin123 - bcrypt hashed)
-INSERT INTO `users` (`username`, `full_name`, `email`, `password_hash`, `role`, `facility_id`) 
-VALUES ('admin', 'System Administrator', 'admin@quickwash.hub', '$2y$10$9Xk.A75uNylW6Ba4DSEoLumXa1ie6MyJYM7aUcaQBhyFBRL6GWPfq', 'admin', 1);
+-- Default Admin is seeded by `php artisan db:seed` instead of this file, so no
+-- known password hash lives in the repository (see backend/database/seeders).
 
 INSERT INTO `devices` (`id`, `facility_id`, `name`, `type`) VALUES 
 ('esp32_bay_1', 1, 'Main Wash Controller', 'controller'),
