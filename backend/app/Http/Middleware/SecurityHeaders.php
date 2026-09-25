@@ -16,6 +16,25 @@ class SecurityHeaders
 {
     public function handle(Request $request, Closure $next): Response
     {
+        $origin = $request->header('Origin');
+        $isAllowed = $origin && (
+            preg_match('/^https:\/\/.*\.vercel\.app$/', $origin) ||
+            preg_match('/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/', $origin) ||
+            $origin === env('FRONTEND_URL')
+        );
+
+        if ($request->isMethod('OPTIONS')) {
+            $preflight = response('', 204);
+            if ($isAllowed) {
+                $preflight->headers->set('Access-Control-Allow-Origin', $origin);
+                $preflight->headers->set('Access-Control-Allow-Credentials', 'true');
+                $preflight->headers->set('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+                $preflight->headers->set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
+                $preflight->headers->set('Access-Control-Max-Age', '86400');
+            }
+            return $preflight;
+        }
+
         $response = $next($request);
 
         $isProd = app()->environment('production');
