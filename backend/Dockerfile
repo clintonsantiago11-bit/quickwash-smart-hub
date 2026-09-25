@@ -44,8 +44,14 @@ COPY . .
 
 COPY --from=vendor /app/vendor ./vendor
 
-RUN chown -R www-data:www-data storage bootstrap/cache \
-    && rm -rf storage/app/public && mkdir -p storage/app/public
+RUN mkdir -p storage/framework/cache/data \
+             storage/framework/sessions \
+             storage/framework/views \
+             storage/logs \
+             storage/app/public \
+             bootstrap/cache \
+    && chown -R www-data:www-data storage bootstrap/cache \
+    && chmod -R 775 storage bootstrap/cache
 
 COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
