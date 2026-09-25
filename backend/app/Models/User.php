@@ -28,6 +28,11 @@ class User extends Authenticatable
         'password_hash',
     ];
 
+    public function getAuthPassword()
+    {
+        return $this->password_hash;
+    }
+
     public function facility()
     {
         return $this->belongsTo(Facility::class);
