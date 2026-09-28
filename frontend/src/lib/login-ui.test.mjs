@@ -28,7 +28,7 @@ test('login uses plain product copy without fake coin-terminal language', () => 
   }
 });
 
-test('the coin mechanism plays over the card as a modal dialog', () => {
+test('the coin mechanism covers the screen as a card-sized modal dialog', () => {
   const page = source('../app/login/page.tsx');
   const overlay = source('../components/login/CoinSlotOverlay.tsx');
   const styles = source('../app/globals.css');
@@ -38,22 +38,44 @@ test('the coin mechanism plays over the card as a modal dialog', () => {
 
   assert.match(overlay, /role="dialog"/);
   assert.match(overlay, /aria-modal="true"/);
-  assert.match(overlay, /aria-labelledby="login-coin-overlay-title"/);
-  assert.match(overlay, /panelRef\.current\?\.focus\(\)/);
+  assert.match(overlay, /aria-labelledby="slot-stage-title"/);
+  assert.match(overlay, /stageRef\.current\?\.focus\(\)/);
 
   // Nothing in the dialog is actionable, so Tab must not walk out behind
   // the scrim into the disabled form.
   assert.match(overlay, /onKeyDown=\{holdFocus\}/);
   assert.match(overlay, /if \(event\.key !== 'Tab'\) return;/);
-  assert.match(overlay, /event\.preventDefault\(\);\s*\n\s*panelRef\.current\?\.focus\(\);/);
+  assert.match(overlay, /event\.preventDefault\(\);\s*\n\s*stageRef\.current\?\.focus\(\);/);
 
-  // Absolute, so the card cannot change height and the fields cannot slide
-  // out from under the pointer.
-  assert.match(styles, /\.login-coin-overlay\s*\{[\s\S]*?position: absolute;/);
-  assert.match(styles, /\.login-coin-overlay\s*\{[\s\S]*?inset: 0;/);
+  // Fixed to the whole viewport, and the stage is card-sized and centred.
+  assert.match(styles, /\.slot-scrim\s*\{[\s\S]*?position: fixed;/);
+  assert.match(styles, /\.slot-scrim\s*\{[\s\S]*?inset: 0;/);
+  assert.match(styles, /\.slot-scrim\s*\{[\s\S]*?place-items: center;/);
+  assert.match(styles, /\.slot-stage\s*\{[\s\S]*?width: min\(100%, 25\.5rem\)/);
 });
 
-test('a rejected credential jams the coin, ejects it, then offers a retry', () => {
+test('the coin is a plain blue disc clipped by the slotway', () => {
+  const overlay = source('../components/login/CoinSlotOverlay.tsx');
+  const styles = source('../app/globals.css');
+
+  // The coin has to be a child of the clipping slotway, otherwise it slides
+  // in front of the machine instead of being swallowed by it.
+  assert.match(overlay, /className="slot-slotway"[\s\S]*?className="slot-coin"/);
+  assert.match(styles, /\.slot-slotway\s*\{[\s\S]*?overflow: hidden;/);
+
+  // A blue circle, not a decorated token.
+  const coin = styles.slice(styles.indexOf('.slot-coin {'), styles.indexOf('.slot-coin::after'));
+  assert.match(coin, /border-radius: 50%/);
+  assert.match(coin, /radial-gradient\(circle at 36% 30%, #A5E4FF/);
+  assert.match(coin, /width: 5\.2rem;\s*\n\s*height: 5\.2rem;/);
+
+  // The slit is cut into a metal faceplate with a bright lip over it.
+  assert.match(overlay, /className="slot-plate"/);
+  assert.match(overlay, /className="slot-lip"/);
+  assert.match(overlay, /className="slot-slit"/);
+});
+
+test('a rejected credential catches the coin, returns it, then offers a retry', () => {
   const auth = source('./auth.ts');
   const page = source('../app/login/page.tsx');
   const form = source('../components/login/CredentialForm.tsx');
@@ -70,13 +92,14 @@ test('a rejected credential jams the coin, ejects it, then offers a retry', () =
   assert.match(page, /setPhase\('jam'\)/);
   assert.match(page, /await wait\(totalRejectMs\(\)\)/);
 
-  // Rattle first, eject second, on separate properties of the same coin.
-  assert.match(styles, /@keyframes login-coin-rattle/);
-  assert.match(styles, /@keyframes login-coin-eject/);
+  // Catch first, return second, on separate properties of the same disc.
+  assert.match(styles, /@keyframes slot-coin-catch/);
+  assert.match(styles, /@keyframes slot-coin-return/);
   assert.match(
     styles,
-    /login-coin-rattle 280ms[^\n]*login-coin-eject 420ms[^\n]*280ms/,
+    /slot-coin-catch 280ms[^\n]*slot-coin-return 420ms[^\n]*280ms/,
   );
+  assert.match(styles, /\.slot-scrim\[data-phase='rejecting'\] \.slot-blocker \{ opacity: 1; \}/);
 
   // The retry is the sign-in button itself, relabelled, and it is only
   // reachable once the coin has been ejected and the form is live again.
@@ -114,8 +137,8 @@ test('the coin mechanism honours reduced motion in every state', () => {
   for (const phase of ['inserting', 'authenticating', 'rejecting', 'success']) {
     assert.match(
       block,
-      new RegExp(`login-coin-overlay\\[data-phase='${phase}'\\]`),
-      `reduced motion must hold a static state for: ${phase}`,
+      new RegExp(`slot-scrim\\[data-phase='${phase}'\\] \\.slot-coin`),
+      `reduced motion must hold a static coin position for: ${phase}`,
     );
   }
 });

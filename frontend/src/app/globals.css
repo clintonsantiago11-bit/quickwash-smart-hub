@@ -1,4 +1,4 @@
-@import "tailwindcss";
+﻿@import "tailwindcss";
 
 @theme {
   --font-display: var(--font-ui), "Inter", sans-serif;
@@ -161,7 +161,7 @@
 }
 
 /* ============================================================
-   LOGIN — professional smart-facility access.
+   LOGIN â€” professional smart-facility access.
    ============================================================ */
 .login-scene {
   position: relative;
@@ -394,188 +394,242 @@
 .login-btn:active:not(:disabled) { transform: translateY(1px); }
 .login-btn:focus-visible { outline: 3px solid rgba(103, 232, 249, 0.55); outline-offset: 3px; }
 .login-btn:disabled { cursor: wait; opacity: 0.72; }
-/* --- Coin reader overlay --------------------------------------------
-   The mechanism floats over the whole card while a credential is being
-   checked, so the card keeps its height and the fields never slide out
-   from under the pointer. */
-.login-coin-overlay {
-  position: absolute;
-  z-index: 20;
+/* ============================================================
+   Coin reader â€” a full-screen scrim with the mechanism on a
+   card-sized stage in the middle. Built from scratch: a brushed
+   metal faceplate, a slit cut into it with a bright lip, a blue
+   coin that is clipped by the slotway so it is genuinely swallowed
+   rather than passing in front of the machine, a scan beam and a
+   status lamp.
+   ============================================================ */
+.slot-scrim {
+  position: fixed;
+  z-index: 60;
   inset: 0;
   display: grid;
   place-items: center;
-  border-radius: inherit;
-  background: linear-gradient(180deg, rgba(6, 15, 26, 0.86), rgba(4, 10, 18, 0.94));
-  backdrop-filter: blur(7px) saturate(0.85);
-  animation: login-coin-overlay-in 240ms ease-out both;
+  padding: 1.5rem;
+  background: rgba(4, 10, 18, 0.8);
+  backdrop-filter: blur(18px) saturate(0.65) brightness(0.5);
+  animation: slot-scrim-in 200ms ease-out both;
 }
-.login-coin-overlay[data-phase='rejecting'] {
-  background: linear-gradient(180deg, rgba(52, 16, 20, 0.88), rgba(18, 9, 13, 0.95));
-}
-.login-coin-overlay[data-phase='success'] {
-  background: linear-gradient(180deg, rgba(5, 42, 32, 0.86), rgba(5, 18, 21, 0.95));
-}
-.login-coin-panel {
+.slot-stage {
   display: grid;
-  width: min(100% - 2.5rem, 25rem);
-  grid-template-columns: 8.5rem minmax(0, 1fr);
-  align-items: center;
-  gap: 1.25rem;
+  width: min(100%, 25.5rem);
+  gap: 1.5rem;
+  border: 1px solid #21364D;
+  border-radius: 1.5rem;
+  background: linear-gradient(180deg, rgba(17, 34, 56, 0.98), rgba(9, 21, 36, 0.99));
+  box-shadow: 0 44px 96px -32px rgba(0, 0, 0, 0.92), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  padding: 1.75rem 1.5rem 1.5rem;
   outline: none;
+  animation: slot-stage-in 300ms cubic-bezier(0.2, 0.8, 0.3, 1) both;
 }
-.login-coin-machine { position: relative; width: 8.5rem; height: 4.8rem; transform: scale(1.28); }
-.login-coin-guide {
+
+/* --- The machine --- */
+.slot-mech { position: relative; height: 15rem; }
+.slot-plate {
   position: absolute;
-  top: 0.15rem;
-  left: 2.15rem;
-  width: 4.2rem;
-  height: 2.7rem;
-  border-right: 1px solid rgba(148, 163, 184, 0.28);
-  border-left: 1px solid rgba(148, 163, 184, 0.28);
-  background: linear-gradient(90deg, transparent, rgba(103, 232, 249, 0.035), transparent);
+  z-index: 1;
+  top: 3rem;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  border-radius: 1.15rem 1.15rem 0.85rem 0.85rem;
+  background:
+    linear-gradient(180deg, rgba(203, 226, 245, 0.16), rgba(203, 226, 245, 0) 26%),
+    linear-gradient(180deg, #16283C 0%, #0C1B2B 42%, #071220 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(203, 226, 245, 0.3),
+    inset 0 -20px 28px -20px rgba(0, 0, 0, 0.9),
+    0 14px 30px -18px rgba(0, 0, 0, 0.9);
 }
-.login-coin-slot-track {
-  position: absolute;
-  z-index: 3;
-  top: 2.75rem;
-  right: 0.45rem;
-  left: 0.45rem;
-  height: 1.15rem;
-  overflow: hidden;
-  border: 1px solid #365873;
-  border-radius: 0.45rem;
-  background: linear-gradient(180deg, #02070C, #0A1928 58%, #102A3D);
-  box-shadow: inset 0 5px 10px rgba(0, 0, 0, 0.92), 0 1px 0 rgba(255, 255, 255, 0.05);
-}
-.login-coin-slot-track::after {
+.slot-plate::before {
   content: '';
   position: absolute;
-  top: 0.34rem;
-  right: 0.35rem;
-  left: 0.35rem;
-  height: 0.28rem;
-  border-radius: 9999px;
-  background: #02060A;
-  box-shadow: 0 1px 0 rgba(103, 232, 249, 0.18);
+  inset: 0;
+  border-radius: inherit;
+  background: repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.03) 0 1px, transparent 1px 3px);
 }
-.login-coin-drop {
+/* The metal lip along the top of the slit, drawn over the coin so the coin
+   passes behind it the way it would on a real reader. */
+.slot-lip {
   position: absolute;
-  z-index: 4;
-  top: 0.2rem;
-  left: 4.25rem;
-  width: 1.55rem;
-  height: 1.55rem;
-  border: 2px solid #CFFAFE;
-  border-radius: 50%;
-  background: radial-gradient(circle at 34% 27%, #F8FFFF 0 8%, #D6F8FF 9% 22%, #7DD3FC 23% 48%, #0E7490 49% 72%, #164E63 73%);
-  box-shadow: 0 0 16px rgba(34, 211, 238, 0.75), inset 0 0 0 2px rgba(14, 116, 144, 0.28);
-  transform: translateX(-50%);
+  z-index: 3;
+  top: 8rem;
+  left: 50%;
+  width: 12.6rem;
+  height: 0.55rem;
+  margin-left: -6.3rem;
+  border-radius: 0.55rem 0.55rem 0.2rem 0.2rem;
+  background: linear-gradient(180deg, #8FA9C2 0%, #456480 55%, #1C3044 100%);
+  box-shadow: 0 1px 0 rgba(226, 240, 252, 0.4), 0 2px 5px rgba(0, 0, 0, 0.6);
 }
-.login-coin-scan {
+/* Clipping window: the coin cannot be seen below the bottom of the slit,
+   which is what makes it look swallowed. */
+.slot-slotway {
   position: absolute;
-  z-index: 5;
+  z-index: 2;
+  top: 0;
+  left: 50%;
+  width: 12rem;
+  height: 10.35rem;
+  margin-left: -6rem;
+  overflow: hidden;
+}
+.slot-slit {
+  position: absolute;
+  top: 8.4rem;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  border-radius: 0.25rem 0.25rem 0.4rem 0.4rem;
+  background: linear-gradient(180deg, #01060B 0%, #051320 58%, #0B2437 100%);
+  box-shadow: inset 0 5px 10px rgba(0, 0, 0, 0.95), inset 0 -1px 0 rgba(103, 232, 249, 0.2);
+}
+.slot-beam {
+  position: absolute;
   top: 0;
   bottom: 0;
-  left: -28%;
-  width: 24%;
+  left: -32%;
+  width: 32%;
   opacity: 0;
-  background: linear-gradient(90deg, transparent, rgba(207, 250, 254, 0.9), transparent);
-  filter: blur(1px);
+  background: linear-gradient(90deg, transparent, rgba(165, 243, 252, 0.9), transparent);
 }
-.login-coin-jam {
+.slot-blocker {
   position: absolute;
-  z-index: 6;
-  right: 0.55rem;
-  left: 0.55rem;
-  top: 0.43rem;
+  top: 50%;
+  right: 9%;
+  left: 9%;
   height: 2px;
+  margin-top: -1px;
   opacity: 0;
   border-radius: 9999px;
   background: #F87171;
   box-shadow: 0 0 10px rgba(248, 113, 113, 0.9);
 }
-.login-coin-return {
+.slot-lamp {
   position: absolute;
-  right: 2.35rem;
-  bottom: 0.22rem;
-  left: 2.35rem;
-  height: 0.42rem;
-  border: 1px solid #28465E;
-  border-radius: 0 0 0.45rem 0.45rem;
-  background: linear-gradient(180deg, #07111C, #03080D);
-  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.8);
+  z-index: 4;
+  left: 50%;
+  bottom: 1.6rem;
+  width: 0.7rem;
+  height: 0.7rem;
+  margin-left: -0.35rem;
+  border-radius: 50%;
+  background: #0E7490;
+  box-shadow: 0 0 0 3px rgba(7, 18, 32, 0.9), 0 0 10px rgba(34, 211, 238, 0.45);
+  transition: background 200ms ease, box-shadow 200ms ease;
 }
-.login-coin-copy { min-width: 0; }
-.login-verify-title { color: #CFFAFE; font-size: 0.8125rem; font-weight: 800; letter-spacing: 0.01em; }
-.login-verify-message { margin-top: 0.25rem; color: #8FA5B9; font-size: 0.75rem; line-height: 1.45; }
-.login-coin-overlay[data-phase='inserting'] .login-coin-drop { animation: login-coin-drop 520ms cubic-bezier(0.22, 0.8, 0.32, 1) both; }
-.login-coin-overlay[data-phase='authenticating'] .login-coin-drop { top: 2.56rem; opacity: 0.82; transform: translateX(-50%) scale(0.72); }
-.login-coin-overlay[data-phase='authenticating'] .login-coin-scan { opacity: 1; animation: login-coin-scan 850ms linear infinite; }
 
-/* A rejected coin stops dead in the reader, rattles, then gets thrown back
-   out. Rattle and eject are separate animations on separate properties so
-   they can run one after the other on the same element. */
-.login-coin-overlay[data-phase='rejecting'] .login-coin-panel { animation: login-feedback-shake 320ms ease-in-out 1; }
-.login-coin-overlay[data-phase='rejecting'] .login-coin-slot-track { border-color: #F87171; box-shadow: inset 0 5px 10px rgba(0, 0, 0, 0.92), 0 0 16px rgba(248, 113, 113, 0.35); }
-.login-coin-overlay[data-phase='rejecting'] .login-coin-jam { opacity: 1; }
-.login-coin-overlay[data-phase='rejecting'] .login-coin-drop {
-  top: 2.2rem;
-  opacity: 1;
-  transform: translateX(-50%) rotate(18deg) scale(0.86);
-  animation: login-coin-rattle 280ms ease-in-out 1, login-coin-eject 420ms cubic-bezier(0.4, 0, 0.7, 1) 280ms both;
+/* --- The coin: a blue disc, nothing more --- */
+.slot-coin {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 5.2rem;
+  height: 5.2rem;
+  margin-left: -2.6rem;
+  border-radius: 50%;
+  background: radial-gradient(circle at 36% 30%, #A5E4FF 0 10%, #4CC3F5 11% 32%, #0EA5E9 33% 58%, #0284C7 59% 80%, #0C4A6E 81% 100%);
+  box-shadow:
+    0 0 0 2px rgba(186, 240, 255, 0.5),
+    0 0 26px rgba(14, 165, 233, 0.5),
+    inset 0 -4px 10px rgba(2, 32, 52, 0.5);
 }
-.login-coin-overlay[data-phase='success'] .login-coin-slot-track { border-color: #34D399; box-shadow: inset 0 5px 10px rgba(0, 0, 0, 0.82), 0 0 16px rgba(52, 211, 153, 0.28); }
-.login-coin-overlay[data-phase='success'] .login-coin-drop { animation: login-coin-accept 420ms ease-in both; }
-@keyframes login-coin-drop {
-  0% { top: 0.2rem; opacity: 0; transform: translateX(-50%) rotate(0deg) scale(0.9); }
+.slot-coin::after {
+  content: '';
+  position: absolute;
+  inset: 0.7rem;
+  border: 1px solid rgba(186, 240, 255, 0.3);
+  border-radius: 50%;
+}
+
+/* --- Readout --- */
+.slot-readout { text-align: center; }
+.slot-readout-title { color: #CFFAFE; font-size: 1rem; font-weight: 800; }
+.slot-readout-detail { margin-top: 0.35rem; color: #8FA5B9; font-size: 0.8125rem; line-height: 1.5; }
+
+/* --- inserting: the coin is fed down into the slit --- */
+.slot-scrim[data-phase='inserting'] .slot-coin { animation: slot-coin-feed 520ms cubic-bezier(0.45, 0, 0.7, 0.5) both; }
+@keyframes slot-coin-feed {
+  0% { top: -1.5rem; opacity: 0; }
   14% { opacity: 1; }
-  68% { top: 1.65rem; transform: translateX(-50%) rotate(150deg) scale(1); }
-  88% { top: 2.55rem; opacity: 1; transform: translateX(-50%) rotate(220deg) scale(0.78); }
-  100% { top: 2.62rem; opacity: 0.18; transform: translateX(-50%) rotate(240deg) scale(0.58); }
+  74% { top: 6rem; }
+  100% { top: 6.4rem; opacity: 1; }
 }
-@keyframes login-coin-scan { to { transform: translateX(520%); } }
-@keyframes login-coin-rattle {
-  0%, 100% { margin-left: 0; }
-  25% { margin-left: -4px; }
-  55% { margin-left: 4px; }
-  80% { margin-left: -2px; }
+
+/* --- authenticating: the coin sits in the reader and is scanned --- */
+.slot-scrim[data-phase='authenticating'] .slot-coin { top: 9.2rem; }
+.slot-scrim[data-phase='authenticating'] .slot-beam { opacity: 1; animation: slot-beam-sweep 900ms linear infinite; }
+.slot-scrim[data-phase='authenticating'] .slot-lamp { background: #22D3EE; box-shadow: 0 0 0 3px rgba(7, 18, 32, 0.9), 0 0 16px rgba(34, 211, 238, 0.85); animation: slot-lamp-pulse 1.1s ease-in-out infinite; }
+@keyframes slot-beam-sweep { to { left: 100%; } }
+@keyframes slot-lamp-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.42; } }
+
+/* --- rejecting: the coin catches at the mouth, rattles, then is returned.
+   Rattle and return are separate animations on separate properties so they
+   can run one after the other on the same disc. --- */
+.slot-scrim[data-phase='rejecting'] { background: rgba(24, 6, 9, 0.82); }
+.slot-scrim[data-phase='rejecting'] .slot-stage { animation: slot-stage-in 300ms cubic-bezier(0.2, 0.8, 0.3, 1) both, slot-stage-shake 300ms ease-in-out 1; }
+.slot-scrim[data-phase='rejecting'] .slot-plate { box-shadow: inset 0 1px 0 rgba(248, 113, 113, 0.4), inset 0 -20px 28px -20px rgba(0, 0, 0, 0.9), 0 0 34px -12px rgba(248, 113, 113, 0.7); }
+.slot-scrim[data-phase='rejecting'] .slot-blocker { opacity: 1; }
+.slot-scrim[data-phase='rejecting'] .slot-lamp { background: #F87171; box-shadow: 0 0 0 3px rgba(7, 18, 32, 0.9), 0 0 18px rgba(248, 113, 113, 0.9); }
+.slot-scrim[data-phase='rejecting'] .slot-coin {
+  top: 5.2rem;
+  animation: slot-coin-catch 280ms ease-in-out 1, slot-coin-return 420ms cubic-bezier(0.4, 0, 0.7, 1) 280ms both;
 }
-@keyframes login-coin-eject {
-  0% { top: 2.2rem; opacity: 1; transform: translateX(-50%) rotate(18deg) scale(0.86); }
-  38% { top: 1.7rem; opacity: 1; transform: translateX(-50%) rotate(-14deg) scale(0.94); }
-  100% { top: 0.1rem; opacity: 0; transform: translateX(-50%) rotate(-46deg) scale(1.06); }
+@keyframes slot-coin-catch {
+  0% { transform: translateX(0) rotate(0deg); }
+  25% { transform: translateX(-3px) rotate(15deg); }
+  55% { transform: translateX(3px) rotate(11deg); }
+  80% { transform: translateX(-1px) rotate(14deg); }
+  100% { transform: translateX(0) rotate(14deg); }
 }
-@keyframes login-feedback-shake {
+@keyframes slot-coin-return {
+  0% { top: 5.2rem; opacity: 1; transform: translateX(0) rotate(14deg); }
+  40% { top: 4.2rem; opacity: 1; transform: translateX(0) rotate(-6deg); }
+  100% { top: -1.2rem; opacity: 0; transform: translateX(0) rotate(-14deg); }
+}
+@keyframes slot-stage-shake {
   0%, 100% { transform: translateX(0); }
-  30% { transform: translateX(-4px); }
-  65% { transform: translateX(4px); }
+  30% { transform: translateX(-5px); }
+  65% { transform: translateX(5px); }
 }
-@keyframes login-coin-overlay-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
+
+/* --- success: accepted --- */
+.slot-scrim[data-phase='success'] { background: rgba(3, 20, 16, 0.82); }
+.slot-scrim[data-phase='success'] .slot-plate { box-shadow: inset 0 1px 0 rgba(52, 211, 153, 0.45), inset 0 -20px 28px -20px rgba(0, 0, 0, 0.9), 0 0 34px -10px rgba(52, 211, 153, 0.8); }
+.slot-scrim[data-phase='success'] .slot-lamp { background: #34D399; box-shadow: 0 0 0 3px rgba(7, 18, 32, 0.9), 0 0 20px rgba(52, 211, 153, 0.95); }
+.slot-scrim[data-phase='success'] .slot-coin { animation: slot-coin-accept 420ms ease-in 120ms both; }
+@keyframes slot-coin-accept {
+  0% { top: 9.2rem; opacity: 1; }
+  100% { top: 10.4rem; opacity: 0; }
 }
-@keyframes login-coin-accept {
-  to { top: 2.65rem; opacity: 0; transform: translateX(-50%) rotate(300deg) scale(0.35); }
+@keyframes slot-scrim-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes slot-stage-in {
+  from { opacity: 0; transform: translateY(14px) scale(0.97); }
+  to { opacity: 1; transform: none; }
 }
-/* --- Settled-failure notice, shown above the fields once the coin is out --- */
-.login-coin-notice {
+
+/* --- Settled-failure notice, above the fields once the coin is back --- */
+.slot-notice {
   display: grid;
   gap: 0.2rem;
   border: 1px solid rgba(248, 113, 113, 0.35);
   border-radius: 0.8rem;
   background: rgba(127, 29, 29, 0.18);
   padding: 0.85rem;
-  animation: login-coin-notice-in 220ms ease-out both;
+  animation: slot-notice-in 220ms ease-out both;
 }
-.login-coin-notice--error { border-color: rgba(251, 191, 36, 0.42); background: rgba(120, 53, 15, 0.18); }
-.login-coin-notice--error .login-alert-title { color: #FDE68A; }
-@keyframes login-coin-notice-in {
+.slot-notice--error { border-color: rgba(251, 191, 36, 0.42); background: rgba(120, 53, 15, 0.18); }
+.slot-notice--error .slot-notice-title { color: #FDE68A; }
+.slot-notice--error .slot-notice-detail { color: #E3D3AE; }
+.slot-notice-title { color: #FCA5A5; font-size: 0.8125rem; font-weight: 750; }
+.slot-notice-detail { color: #D7B0B0; font-size: 0.75rem; line-height: 1.45; }
+@keyframes slot-notice-in {
   from { opacity: 0; transform: translateY(-4px); }
   to { opacity: 1; transform: translateY(0); }
 }
-.login-alert-title { color: #FCA5A5; font-size: 0.8125rem; font-weight: 750; }
-.login-alert-message { color: #D7B0B0; font-size: 0.75rem; line-height: 1.45; }
-.login-coin-notice--error .login-alert-message { color: #E3D3AE; }
 .login-card-foot { margin-top: 1.75rem; border-top: 1px solid #1D3349; padding-top: 1.1rem; color: #70869A; font-size: 0.7rem; }
 @media (max-width: 1023px) {
   .login-scene { align-items: start; }
@@ -598,15 +652,15 @@
   .login-card::before { left: 1.5rem; right: 1.5rem; }
   .login-form { margin-top: 1.5rem; }
   .login-input { font-size: 1rem; }
-  .login-coin-panel { grid-template-columns: minmax(0, 1fr); justify-items: center; gap: 1rem; text-align: center; }
-  .login-coin-machine { transform: scale(1.15); }
+  .slot-scrim { padding: 1rem; }
+  .slot-stage { width: min(100%, 22rem); padding: 1.4rem 1.15rem 1.25rem; }
 }
 @media (max-height: 720px) and (min-width: 1024px) {
   .login-context-copy { margin-top: 3.5rem; }
   .login-context h1 { font-size: 3.5rem; }
 }
-/* Reduced motion: every state stays legible, nothing travels. The stuck
-   coin is held in place during the jam instead of being thrown out. */
+/* Reduced motion: every state stays legible, nothing travels. The caught
+   coin is held at the mouth instead of being returned. */
 @media (prefers-reduced-motion: reduce) {
   .login-skip-link,
   .login-field,
@@ -614,15 +668,15 @@
   .login-eye,
   .login-checkbox,
   .login-btn,
-  .login-coin-overlay,
-  .login-coin-panel,
-  .login-coin-machine,
-  .login-coin-drop,
-  .login-coin-scan,
-  .login-coin-slot-track,
-  .login-coin-notice { animation: none !important; transition: none !important; }
-  .login-coin-overlay[data-phase='inserting'] .login-coin-drop { top: 1.4rem; opacity: 1; }
-  .login-coin-overlay[data-phase='authenticating'] .login-coin-scan { left: 38%; opacity: 0.5; }
-  .login-coin-overlay[data-phase='rejecting'] .login-coin-drop { top: 2.2rem; opacity: 1; }
-  .login-coin-overlay[data-phase='success'] .login-coin-drop { opacity: 0.2; }
+  .slot-scrim,
+  .slot-stage,
+  .slot-coin,
+  .slot-beam,
+  .slot-lamp,
+  .slot-notice { animation: none !important; transition: none !important; }
+  .slot-scrim[data-phase='inserting'] .slot-coin { top: 6.4rem; }
+  .slot-scrim[data-phase='authenticating'] .slot-beam { left: 36%; opacity: 0.6; }
+  .slot-scrim[data-phase='authenticating'] .slot-coin { top: 9.2rem; }
+  .slot-scrim[data-phase='rejecting'] .slot-coin { top: 5.2rem; transform: rotate(14deg); }
+  .slot-scrim[data-phase='success'] .slot-coin { top: 10.4rem; opacity: 0; }
 }
