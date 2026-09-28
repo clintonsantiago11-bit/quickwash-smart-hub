@@ -18,9 +18,11 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  Download,
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { api } from '@/lib/api';
+import { exportRows, type ExportFormat } from '@/lib/export';
 
 interface AuditItem {
   id: number;
@@ -83,6 +85,8 @@ export default function AuditLogPage() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
+  const [format, setFormat] = useState<ExportFormat>('excel');
+  const [exporting, setExporting] = useState(false);
 
   const fetchLogs = async (action = filter, query = search, pageNum = page) => {
     setRefreshing(true);
@@ -136,6 +140,28 @@ export default function AuditLogPage() {
     return acc;
   }, {});
 
+  const handleExport = async () => {
+    if (exporting || auditLogs.length === 0) return;
+    setExporting(true);
+    try {
+      await exportRows(
+        auditLogs.map((log) => ({
+          Timestamp: log.time,
+          User: log.user,
+          IP: log.ip ?? '',
+          Action: getActionLabel(log.action),
+          Details: log.details,
+        })),
+        `quickwash_audit_log_${new Date().toISOString().slice(0, 10)}`,
+        format,
+      );
+    } catch (error) {
+      console.warn('Audit export failed', error);
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <>
       <Header title="Audit Log" subtitle="Complete, real-time record of system events and administrative actions" />
@@ -187,6 +213,34 @@ export default function AuditLogPage() {
                 <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
               </button>
             </form>
+
+            {/* Export current page of events */}
+            <div className="flex items-center gap-2 shrink-0">
+              <div className="relative">
+                <select
+                  value={format}
+                  onChange={(e) => setFormat(e.target.value as ExportFormat)}
+                  aria-label="Download format"
+                  className="h-9 pl-3 pr-9 rounded-lg bg-[var(--bg-elevated)] border border-[var(--border)] text-xs font-semibold outline-none focus:border-[var(--accent)] transition-colors appearance-none cursor-pointer"
+                >
+                  <option value="excel">Excel</option>
+                  <option value="csv">CSV</option>
+                  <option value="pdf">PDF</option>
+                </select>
+                <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none opacity-60" />
+              </div>
+              <button
+                type="button"
+                onClick={handleExport}
+                disabled={exporting || auditLogs.length === 0}
+                title={auditLogs.length === 0 ? 'No events to download' : `Download the listed events`}
+                className="h-9 px-3 rounded-lg text-xs font-bold flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
+                style={{ background: 'var(--accent)', color: 'var(--bg-base)' }}
+              >
+                <Download size={14} />
+                {exporting ? 'Preparing…' : 'Download'}
+              </button>
+            </div>
           </div>
 
           {/* Summary chips */}

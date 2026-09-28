@@ -13,6 +13,8 @@
     "test": "node --experimental-strip-types --test src/lib/*.test.mjs"
   },
   "dependencies": {
+    "exceljs": "^4.4.0",
+    "jspdf": "^4.2.1",
     "lucide-react": "^1.16.0",
     "motion": "^13.2.0",
     "next": "16.2.6",

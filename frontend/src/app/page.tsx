@@ -14,6 +14,16 @@ import {
 import { useState, useEffect } from 'react';
 import { api } from '@/lib/api';
 import { socketService } from '@/lib/socket';
+import {
+  naekLastCycle,
+  normalizeSupplies,
+  resolveBayStatus,
+  type BayStatus,
+  type SupplyItem,
+} from '@/lib/dashboard';
+
+const NAEK_DEVICE_ID = 'naek_carwash_1';
+const BAY_DEVICE_ID = 'esp32_bay_1';
 
 interface DeviceItem {
   id: string;
@@ -25,14 +35,13 @@ interface DeviceItem {
   lastPing: string;
 }
 
-interface BayState {
-  online: boolean;
-  hasStatus: boolean;
-  status: 'active' | 'available' | 'error';
+interface BayCycleState {
   progress: number;
   currentCycle: string;
   cycleType: string;
 }
+
+const defaultCycle: BayCycleState = { progress: 0, currentCycle: '—', cycleType: '—' };
 
 interface StatCard {
   label: string;
@@ -42,21 +51,6 @@ interface StatCard {
   icon: typeof TrendingUp;
   color: string;
 }
-
-interface SupplyItem {
-  label: string;
-  level: number | null;
-  color: string;
-}
-
-const defaultBay: BayState = {
-  online: false,
-  hasStatus: false,
-  status: 'available',
-  progress: 0,
-  currentCycle: '—',
-  cycleType: '—',
-};
 
 const STAT_ICONS: Record<string, { icon: typeof TrendingUp; color: string }> = {
   "Today's Revenue": { icon: TrendingUp, color: 'var(--text-muted)' },
@@ -73,15 +67,13 @@ export default function DashboardPage() {
     { label: 'Active Alerts', value: '—', icon: AlertTriangle, color: "var(--text-muted)" },
   ]);
 
-  const [supplies, setSupplies] = useState<SupplyItem[]>([
-    { label: "Water Tank", level: null, color: "#00B4D8" },
-    { label: "Soap Tank A", level: null, color: "#F6AD55" },
-    { label: "Soap Tank B", level: null, color: "#00F5A0" },
-  ]);
+  const [supplies, setSupplies] = useState<SupplyItem[]>(() => normalizeSupplies(undefined));
 
   const [flowRate, setFlowRate] = useState<number | null>(null);
   const [temperature, setTemperature] = useState<number | null>(null);
-  const [bay, setBay] = useState<BayState>(defaultBay);
+  const [esp32Status, setEsp32Status] = useState<BayStatus | null>(null);
+  const [naekOnline, setNaekOnline] = useState(false);
+  const [cycle, setCycle] = useState<BayCycleState>(defaultCycle);
   const [bayName, setBayName] = useState('');
   const [sendingCommand, setSendingCommand] = useState(false);
 
@@ -94,7 +86,7 @@ export default function DashboardPage() {
           icon: STAT_ICONS[s.label]?.icon ?? TrendingUp,
           color: STAT_ICONS[s.label]?.color ?? 'var(--text-muted)',
         })));
-        setSupplies(data.supplies);
+        setSupplies(normalizeSupplies(data.supplies));
         setFlowRate(data.flow_rate);
         setTemperature(data.temperature);
       } catch {
@@ -110,11 +102,13 @@ export default function DashboardPage() {
             ? { ...s, value: String(online), subValue: `/ ${devices.length}` }
             : s
         ));
-        const bayDevice = devices.find((d: DeviceItem) => d.id === 'esp32_bay_1');
-        if (bayDevice) {
-          setBay(prev => ({ ...prev, online: bayDevice.status === 'online' }));
-          setBayName(bayDevice.name || 'Main Wash Bay');
-        }
+        // The NAEK 3-in-1 timer is the machine that actually runs the wash,
+        // so its heartbeat decides whether the bay card reads online.
+        const naekDevice = devices.find((d: DeviceItem) => d.id === NAEK_DEVICE_ID);
+        setNaekOnline(naekDevice?.status === 'online');
+
+        const bayDevice = devices.find((d: DeviceItem) => d.id === BAY_DEVICE_ID);
+        if (bayDevice) setBayName(bayDevice.name || 'Main Wash Bay');
       } catch {
         console.warn('Devices backend unavailable');
       }
@@ -134,29 +128,24 @@ export default function DashboardPage() {
       const category = parts[2];
       const deviceId = parts[3];
 
-      if (deviceId !== 'esp32_bay_1') return;
+      if (deviceId !== BAY_DEVICE_ID) return;
 
       if (category === 'status') {
         const d = msg.data as Record<string, unknown>;
         const rawStatus = String(d.status ?? 'available');
-        const status: BayState['status'] =
-          rawStatus === 'error' ? 'error' : rawStatus === 'active' ? 'active' : 'available';
-        setBay(prev => ({
-          ...prev,
-          online: true,
-          hasStatus: true,
-          status,
+        setEsp32Status(rawStatus === 'error' ? 'error' : rawStatus === 'active' ? 'active' : 'available');
+        setCycle(prev => ({
           progress: typeof d.progress === 'number' ? Math.min(100, Math.max(0, d.progress)) : prev.progress,
           currentCycle: typeof d.currentCycle === 'string' && d.currentCycle ? d.currentCycle : prev.currentCycle,
           cycleType: typeof d.type === 'string' && d.type ? d.type : prev.cycleType,
         }));
       } else if (category === 'sensor' && msg.topic.includes('/levels')) {
         const d = msg.data as Record<string, unknown>;
-        setSupplies([
-          { label: "Water Tank", level: d.water != null ? Number(d.water) : null, color: "#00B4D8" },
-          { label: "Soap Tank A", level: d.soap_a != null ? Number(d.soap_a) : null, color: "#F6AD55" },
-          { label: "Soap Tank B", level: d.soap_b != null ? Number(d.soap_b) : null, color: "#00F5A0" },
-        ]);
+        setSupplies(normalizeSupplies([
+          { label: 'Water Tank', level: d.water },
+          { label: 'Soap Tank A', level: d.soap_a },
+          { label: 'Soap Tank B', level: d.soap_b },
+        ]));
       } else if (category === 'sensor' && msg.topic.includes('/flow_temp')) {
         const d = msg.data as Record<string, unknown>;
         setFlowRate(d.flow_lpm != null ? Number(d.flow_lpm) : null);
@@ -166,33 +155,52 @@ export default function DashboardPage() {
     return () => unsub();
   }, []);
 
+  // NAEK 3-in-1 timer: a snapshot proves the machine answered, and a sale
+  // event names the cycle it just ran.
+  useEffect(() => {
+    socketService.connect();
+    const unsub = socketService.onNaekUpdate((payload) => {
+      if (payload?.snapshot) {
+        setNaekOnline(true);
+        setBayName((prev) => prev || 'NAEK 3-in-1 Carwash Timer');
+      }
+      const lastCycle = naekLastCycle(payload?.events);
+      if (lastCycle) {
+        setCycle((prev) => ({ ...prev, currentCycle: lastCycle, cycleType: 'NAEK' }));
+      }
+    });
+    return () => unsub();
+  }, []);
+
   const sendBayCommand = async (action: string) => {
     setSendingCommand(true);
     try {
-      await api.sendCommand('esp32_bay_1', action);
+      await api.sendCommand(BAY_DEVICE_ID, action);
     } catch {
       console.warn('Failed to send command');
     }
     setSendingCommand(false);
   };
 
+  const { status: bayStatus, hasStatus, online: bayOnline } = resolveBayStatus({ esp32Status, naekOnline });
+
   const statusLabel =
-    !bay.hasStatus ? '—' :
-    bay.status === 'active' ? 'Active' :
-    bay.status === 'error' ? 'Jam Detected' : 'Available';
+    !hasStatus ? '—' :
+    bayStatus === 'active' ? 'Active' :
+    bayStatus === 'error' ? 'Jam Detected' : 'Available';
   const statusColor =
-    bay.status === 'active' ? 'var(--success)' :
-    bay.status === 'error' ? 'var(--danger)' : 'var(--text-muted)';
+    bayStatus === 'active' ? 'var(--success)' :
+    bayStatus === 'error' ? 'var(--danger)' : 'var(--text-muted)';
 
   const controlAction =
-    bay.status === 'error' ? 'reset_jam' :
-    bay.status === 'active' ? 'emergency_stop' : 'trigger_wash';
+    bayStatus === 'error' ? 'reset_jam' :
+    bayStatus === 'active' ? 'emergency_stop' : 'trigger_wash';
   const controlLabel =
-    bay.status === 'error' ? 'Reset Jam' :
-    bay.status === 'active' ? 'Stop Wash' : 'Start Wash';
+    bayStatus === 'error' ? 'Reset Jam' :
+    bayStatus === 'active' ? 'Stop Wash' : 'Start Wash';
   const ControlIcon =
-    bay.status === 'error' ? RotateCcw :
-    bay.status === 'active' ? Square : Play;
+    bayStatus === 'error' ? RotateCcw :
+    bayStatus === 'active' ? Square : Play;
 
   return (
     <>
@@ -239,9 +247,9 @@ export default function DashboardPage() {
                   <Waves size={18} className="text-[var(--accent)]" />
                   Main Wash Bay Status
                 </h3>
-                <span className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest" style={{ color: bay.online ? 'var(--success)' : 'var(--text-muted)' }}>
-                  <span className={`w-1.5 h-1.5 rounded-full ${bay.online ? 'bg-[var(--success)] animate-pulse' : 'bg-[var(--text-muted)]'}`} />
-                  {bay.online ? 'Online' : 'Offline'}
+                <span className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest" style={{ color: bayOnline ? 'var(--success)' : 'var(--text-muted)' }}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${bayOnline ? 'bg-[var(--success)] animate-pulse' : 'bg-[var(--text-muted)]'}`} />
+                  {bayOnline ? 'Online' : 'Offline'}
                 </span>
               </div>
               
@@ -249,24 +257,24 @@ export default function DashboardPage() {
                 <div 
                   className="w-24 h-24 sm:w-32 sm:h-32 rounded-full flex items-center justify-center mb-8"
                   style={{
-                    background: bay.status === 'active'
-                      ? `conic-gradient(var(--accent) ${bay.progress * 3.6}deg, var(--bg-input) 0deg)`
+                    background: bayStatus === 'active'
+                      ? `conic-gradient(var(--accent) ${cycle.progress * 3.6}deg, var(--bg-input) 0deg)`
                       : 'var(--bg-input)',
-                    border: `4px solid ${bay.status === 'error' ? 'var(--danger)' : 'var(--border)'}`,
+                    border: `4px solid ${bayStatus === 'error' ? 'var(--danger)' : 'var(--border)'}`,
                     transition: 'all 0.5s ease',
                   }}
                 >
                    <div className="w-16 h-16 sm:w-24 sm:h-24 rounded-full bg-[var(--bg-elevated)] flex items-center justify-center" style={{ border: '4px solid var(--border)' }}>
-                     {bay.status === 'error' ? (
+                     {bayStatus === 'error' ? (
                        <AlertTriangle size={32} style={{ color: 'var(--danger)' }} />
                      ) : (
-                       <Waves size={32} style={{ color: bay.status === 'active' ? 'var(--accent)' : 'var(--text-muted)' }} />
+                       <Waves size={32} style={{ color: bayStatus === 'active' ? 'var(--accent)' : 'var(--text-muted)' }} />
                      )}
                    </div>
                 </div>
                 
                 <div className="space-y-2 mb-10">
-                  <h4 className="text-3xl sm:text-4xl font-bold font-ui uppercase tracking-tight" style={{ color: bay.online ? 'var(--text-primary)' : 'var(--text-muted)' }}>{bayName || '—'}</h4>
+                  <h4 className="text-3xl sm:text-4xl font-bold font-ui uppercase tracking-tight" style={{ color: bayOnline ? 'var(--text-primary)' : 'var(--text-muted)' }}>{bayName || '—'}</h4>
                   <div className="flex items-center justify-center gap-2">
                     <AlertTriangle size={16} style={{ color: statusColor }} />
                     <span className="text-sm font-bold uppercase tracking-widest" style={{ color: statusColor }}>{statusLabel}</span>
@@ -276,28 +284,28 @@ export default function DashboardPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 w-full max-w-md">
                   <div className="p-4 rounded-2xl bg-[var(--bg-input)] border border-[var(--border)]">
                     <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase mb-1">Selected Cycle</p>
-                    <p className="font-bold text-[var(--text-primary)]">{bay.currentCycle}</p>
+                    <p className="font-bold text-[var(--text-primary)]">{cycle.currentCycle}</p>
                   </div>
                   <div className="p-4 rounded-2xl bg-[var(--bg-input)] border border-[var(--border)]">
                     <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase mb-1">Wash Type</p>
-                    <p className="font-bold text-[var(--text-primary)]">{bay.cycleType}</p>
+                    <p className="font-bold text-[var(--text-primary)]">{cycle.cycleType}</p>
                   </div>
                   <div className="p-4 rounded-2xl bg-[var(--bg-input)] border border-[var(--border)]">
                     <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase mb-1">Progress</p>
-                    <p className="font-bold font-mono" style={{ color: bay.status === 'active' ? 'var(--accent)' : 'var(--text-primary)' }}>
-                      {bay.status === 'active' ? `${Math.round(bay.progress)}%` : '—'}
+                    <p className="font-bold font-mono" style={{ color: bayStatus === 'active' ? 'var(--accent)' : 'var(--text-primary)' }}>
+                      {bayStatus === 'active' ? `${Math.round(cycle.progress)}%` : '—'}
                     </p>
                   </div>
                 </div>
 
                 <button
                   onClick={() => sendBayCommand(controlAction)}
-                  disabled={!bay.online || sendingCommand}
+                  disabled={!bayOnline || sendingCommand}
                   className="btn btn-primary w-full max-w-md mt-8 py-4 sm:py-5 flex items-center justify-center gap-3 text-lg transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-                  style={!bay.online ? { background: 'var(--border)', color: 'var(--text-muted)', boxShadow: 'none' } : undefined}
+                  style={!bayOnline ? { background: 'var(--border)', color: 'var(--text-muted)', boxShadow: 'none' } : undefined}
                 >
                   <ControlIcon size={20} fill="currentColor" />
-                  {sendingCommand ? 'SENDING...' : !bay.online ? 'SYSTEM OFFLINE' : controlLabel}
+                  {sendingCommand ? 'SENDING...' : !bayOnline ? 'SYSTEM OFFLINE' : controlLabel}
                 </button>
               </div>
             </div>

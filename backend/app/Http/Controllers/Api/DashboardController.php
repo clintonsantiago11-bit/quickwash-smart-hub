@@ -52,7 +52,6 @@ class DashboardController extends Controller
                 ['label' => 'Water Tank', 'level' => $latestLevels?->water_level, 'color' => '#00B4D8'],
                 ['label' => 'Soap Tank A', 'level' => $latestLevels?->soap_a_level, 'color' => '#F6AD55'],
                 ['label' => 'Soap Tank B', 'level' => $latestLevels?->soap_b_level, 'color' => '#00F5A0'],
-                ['label' => 'Wax Tank', 'level' => $latestLevels?->wax_level, 'color' => '#9F7AEA'],
             ],
             'flow_rate' => $latestFlowTemp?->flow_rate,
             'temperature' => $latestFlowTemp?->temperature,
