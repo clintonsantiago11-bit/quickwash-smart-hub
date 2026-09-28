@@ -28,33 +28,96 @@ test('login uses plain product copy without fake coin-terminal language', () => 
   }
 });
 
-test('coin-slot feedback maps credential attempts to insert, authenticate, jam, and accept states', () => {
+test('the coin mechanism plays over the card as a modal dialog', () => {
+  const page = source('../app/login/page.tsx');
+  const overlay = source('../components/login/CoinSlotOverlay.tsx');
+  const styles = source('../app/globals.css');
+
+  assert.match(page, /<CoinSlotOverlay/);
+  assert.doesNotMatch(page, /CoinSlotFeedback/);
+
+  assert.match(overlay, /role="dialog"/);
+  assert.match(overlay, /aria-modal="true"/);
+  assert.match(overlay, /aria-labelledby="login-coin-overlay-title"/);
+  assert.match(overlay, /panelRef\.current\?\.focus\(\)/);
+
+  // Nothing in the dialog is actionable, so Tab must not walk out behind
+  // the scrim into the disabled form.
+  assert.match(overlay, /onKeyDown=\{holdFocus\}/);
+  assert.match(overlay, /if \(event\.key !== 'Tab'\) return;/);
+  assert.match(overlay, /event\.preventDefault\(\);\s*\n\s*panelRef\.current\?\.focus\(\);/);
+
+  // Absolute, so the card cannot change height and the fields cannot slide
+  // out from under the pointer.
+  assert.match(styles, /\.login-coin-overlay\s*\{[\s\S]*?position: absolute;/);
+  assert.match(styles, /\.login-coin-overlay\s*\{[\s\S]*?inset: 0;/);
+});
+
+test('a rejected credential jams the coin, ejects it, then offers a retry', () => {
   const auth = source('./auth.ts');
   const page = source('../app/login/page.tsx');
   const form = source('../components/login/CredentialForm.tsx');
-  const feedback = source('../components/login/CoinSlotFeedback.tsx');
+  const sequence = source('./login-sequence.ts');
   const styles = source('../app/globals.css');
-  const loginFeedback = `${form}\n${feedback}`;
 
-  for (const phase of ['inserting', 'authenticating', 'jam', 'success', 'error']) {
+  for (const phase of ['inserting', 'authenticating', 'rejecting', 'jam', 'success', 'error']) {
     assert.match(auth, new RegExp(`['"]${phase}['"]`));
   }
 
-  assert.match(page, /setPhase\('inserting'\)/);
-  assert.match(page, /setPhase\('authenticating'\)/);
-  assert.match(page, /kind === 'credentials' \? 'jam' : 'error'/);
-  assert.match(form, /CoinSlotFeedback/);
-  assert.match(form, /phase=\{phase\}/);
-  assert.doesNotMatch(form, /login-spinner/);
+  assert.match(sequence, /credentials'\) return 'rejecting'/);
+  assert.match(page, /terminalPhase\(kind\)/);
+  assert.match(page, /setPhase\('rejecting'\)/);
+  assert.match(page, /setPhase\('jam'\)/);
+  assert.match(page, /await wait\(totalRejectMs\(\)\)/);
 
-  for (const copy of ['Inserting credential', 'Authenticating', 'Coin jammed', 'Coin accepted', 'Sign-in unavailable']) {
-    assert.match(loginFeedback, new RegExp(copy));
-  }
+  // Rattle first, eject second, on separate properties of the same coin.
+  assert.match(styles, /@keyframes login-coin-rattle/);
+  assert.match(styles, /@keyframes login-coin-eject/);
+  assert.match(
+    styles,
+    /login-coin-rattle 280ms[^\n]*login-coin-eject 420ms[^\n]*280ms/,
+  );
 
-  for (const animation of ['login-coin-drop', 'login-coin-scan', 'login-coin-jam']) {
-    assert.match(styles, new RegExp(animation));
-  }
+  // The retry is the sign-in button itself, relabelled, and it is only
+  // reachable once the coin has been ejected and the form is live again.
+  assert.match(form, /'Retry coin'/);
+  assert.match(form, /isBlockingPhase\(phase\)/);
+  assert.match(page, /phase !== 'jam' && phase !== 'error' && \(/);
+});
+
+test('signing in posts the credential immediately instead of waiting on a fake delay', () => {
+  const page = source('../app/login/page.tsx');
+  const sequence = source('./login-sequence.ts');
+
+  assert.doesNotMatch(page, /COIN_INSERT_MS = 520/, 'the old blocking delay is gone');
+  assert.match(page, /const startedAt = performance\.now\(\)/);
+  assert.match(page, /api\.login\(credentials\.email, credentials\.password\)/);
+  assert.match(page, /shouldHoldResult\(elapsed\)/);
+  assert.match(page, /phaseWhilePending\(performance\.now\(\) - startedAt\)/);
+  assert.match(sequence, /COIN_MIN_VISIBLE_MS/);
+});
+
+test('a jam clears the password and keeps the email; a network fault keeps both', () => {
+  const form = source('../components/login/CredentialForm.tsx');
+
+  assert.match(form, /if \(phase !== 'jam'\) return;/);
+  assert.match(form, /setPassword\(''\)/);
+  assert.doesNotMatch(form, /setEmail\(''\)/);
+  assert.match(form, /passwordRef\.current\?\.focus\(\)/);
+});
+
+test('the coin mechanism honours reduced motion in every state', () => {
+  const styles = source('../app/globals.css');
+  const block = styles.slice(styles.indexOf('prefers-reduced-motion'));
+
   assert.match(styles, /prefers-reduced-motion/);
+  for (const phase of ['inserting', 'authenticating', 'rejecting', 'success']) {
+    assert.match(
+      block,
+      new RegExp(`login-coin-overlay\\[data-phase='${phase}'\\]`),
+      `reduced motion must hold a static state for: ${phase}`,
+    );
+  }
 });
 
 test('QuickWash branding uses the supplied PNG without SVG wrappers', () => {

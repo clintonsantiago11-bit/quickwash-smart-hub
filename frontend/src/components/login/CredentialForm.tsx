@@ -1,32 +1,30 @@
 'use client';
 
-import { Eye, EyeOff, LockKeyhole, Mail, RotateCcw } from 'lucide-react';
+import { Eye, EyeOff, LockKeyhole, Mail } from 'lucide-react';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import CoinSlotFeedback from '@/components/login/CoinSlotFeedback';
-import type { FieldError, LoginCredentials, LoginPhase } from '@/lib/auth';
+import { CoinSlotNotice } from '@/components/login/CoinSlotOverlay';
+import { isBlockingPhase, type FieldError, type LoginCredentials, type LoginPhase } from '@/lib/auth';
 
 interface CredentialFormProps {
   onSubmit: (data: LoginCredentials) => FieldError | null;
   fieldError: FieldError | null;
-  serverMessage: string;
+  notice: { phase: Extract<LoginPhase, 'jam' | 'error'>; message: string } | null;
   phase: LoginPhase;
-  onRetry: () => void;
   onClearError: () => void;
 }
 
 export default function CredentialForm({
   onSubmit,
   fieldError,
-  serverMessage,
+  notice,
   phase,
-  onRetry,
   onClearError,
 }: CredentialFormProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
-  const isSubmitting = phase === 'inserting' || phase === 'authenticating';
+  const isSubmitting = isBlockingPhase(phase);
   const [touched, setTouched] = useState<{ email: boolean; password: boolean }>({
     email: false,
     password: false,
@@ -41,6 +39,16 @@ export default function CredentialForm({
       setEmail(remembered);
     }
   }, []);
+
+  // A rejected coin is the operator's problem, not a machine fault, so the
+  // email stays and the password is cleared ready to be retyped. A network or
+  // server failure leaves both fields alone — nothing was wrong with them.
+  useEffect(() => {
+    if (phase !== 'jam') return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setPassword('');
+    passwordRef.current?.focus();
+  }, [phase]);
 
   const errFor = (field: 'email' | 'password') =>
     touched[field] && fieldError?.field === field ? fieldError.message : null;
@@ -60,20 +68,7 @@ export default function CredentialForm({
 
   return (
     <form onSubmit={submit} noValidate className="login-form">
-      {phase !== 'idle' && <CoinSlotFeedback phase={phase} />}
-
-      {serverMessage && (
-        <div className="login-alert login-alert-error" role="alert">
-          <div>
-            <p className="login-alert-title">{phase === 'jam' ? 'Credential rejected' : 'Sign in unsuccessful'}</p>
-            <p className="login-alert-message">{serverMessage}</p>
-          </div>
-          <button type="button" className="login-retry" onClick={onRetry} disabled={isSubmitting}>
-            <RotateCcw size={15} aria-hidden="true" />
-            {phase === 'jam' ? 'Retry coin' : 'Try again'}
-          </button>
-        </div>
-      )}
+      {notice && <CoinSlotNotice phase={notice.phase} message={notice.message} />}
 
       <div className="login-field-group">
         <label htmlFor="login-email" className="login-label">Email</label>
@@ -162,7 +157,15 @@ export default function CredentialForm({
           ? 'Inserting…'
           : phase === 'authenticating'
             ? 'Authenticating…'
-            : <span>Sign in</span>}
+            : phase === 'rejecting'
+              ? 'Rejecting…'
+              : phase === 'success'
+                ? 'Accepted…'
+                : phase === 'jam'
+                  ? 'Retry coin'
+                  : phase === 'error'
+                    ? 'Try again'
+                    : <span>Sign in</span>}
       </button>
     </form>
   );

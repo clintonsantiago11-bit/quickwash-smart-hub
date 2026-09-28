@@ -28,7 +28,31 @@ export interface AuthResponse {
   user: AuthUser;
 }
 
-export type LoginPhase = 'idle' | 'inserting' | 'authenticating' | 'success' | 'jam' | 'error';
+/**
+ * `rejecting` is the jam itself: the coin is stuck in the reader and being
+ * thrown back out. It settles into `jam`, the resting state that leaves the
+ * form editable so the operator can correct the credential and feed it again.
+ */
+export type LoginPhase =
+  | 'idle'
+  | 'inserting'
+  | 'authenticating'
+  | 'rejecting'
+  | 'success'
+  | 'jam'
+  | 'error';
+
+/** Phases where the card is dimmed and the form cannot be edited. */
+export type BlockingLoginPhase = 'inserting' | 'authenticating' | 'rejecting' | 'success';
+
+export function isBlockingPhase(phase: LoginPhase): phase is BlockingLoginPhase {
+  return (
+    phase === 'inserting' ||
+    phase === 'authenticating' ||
+    phase === 'rejecting' ||
+    phase === 'success'
+  );
+}
 
 export type FieldName = 'email' | 'password';
 

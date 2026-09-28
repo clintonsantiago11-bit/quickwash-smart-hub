@@ -4,7 +4,7 @@ import { ShieldCheck } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api, LoginError } from '@/lib/api';
-import CoinSlotFeedback from '@/components/login/CoinSlotFeedback';
+import CoinSlotOverlay from '@/components/login/CoinSlotOverlay';
 import {
   validateCredentials,
   type AuthResponse,
@@ -12,91 +12,157 @@ import {
   type LoginCredentials,
   type LoginPhase,
 } from '@/lib/auth';
+import {
+  COIN_INSERT_MS,
+  phaseWhilePending,
+  REDIRECT_MS,
+  shouldHoldResult,
+  terminalPhase,
+  totalRejectMs,
+  type OutcomeKind,
+} from '@/lib/login-sequence';
 import CredentialForm from '@/components/login/CredentialForm';
 import QuickWashMark from '@/components/QuickWashMark';
 
-const COIN_INSERT_MS = 520;
-const REDIRECT_MS = 900;
+const failureMessages = {
+  network: 'QuickWash could not be reached. Check your connection, then try again.',
+  timeout: 'The server took too long to respond. Wait a moment, then try again.',
+  credentials: 'The email or password is incorrect. Check your details and try again.',
+  server: 'Sign in is temporarily unavailable. Try again in a moment.',
+} as const;
+
+const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+/** Anything that is not one of the three real failure kinds reads as a server fault. */
+const messageFor = (kind: OutcomeKind): string =>
+  failureMessages[kind === 'network' || kind === 'timeout' || kind === 'credentials' ? kind : 'server'];
 
 export default function LoginPage() {
   const router = useRouter();
   const redirectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const insertionTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const progressTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const attemptId = useRef(0);
   const [phase, setPhase] = useState<LoginPhase>('idle');
   const [serverMessage, setServerMessage] = useState('');
   const [fieldError, setFieldError] = useState<FieldError | null>(null);
   const [signedInName, setSignedInName] = useState('Operator');
-  const lastAttempt = useRef<LoginCredentials | null>(null);
+  const [attempt, setAttempt] = useState(0);
 
-  useEffect(() => () => {
-    attemptId.current += 1;
-    if (redirectTimer.current) clearTimeout(redirectTimer.current);
-    if (insertionTimer.current) clearTimeout(insertionTimer.current);
+  const stopProgress = useCallback(() => {
+    if (progressTimer.current) {
+      clearInterval(progressTimer.current);
+      progressTimer.current = null;
+    }
   }, []);
 
-  const authenticate = useCallback(async (credentials: LoginCredentials) => {
-    const attempt = ++attemptId.current;
-    setFieldError(null);
-    setServerMessage('');
-    setPhase('inserting');
+  useEffect(
+    () => () => {
+      attemptId.current += 1;
+      if (redirectTimer.current) clearTimeout(redirectTimer.current);
+      if (progressTimer.current) clearInterval(progressTimer.current);
+    },
+    []
+  );
 
-    await new Promise<void>((resolve) => {
-      insertionTimer.current = setTimeout(() => {
-        insertionTimer.current = null;
-        resolve();
-      }, COIN_INSERT_MS);
-    });
-    if (attempt !== attemptId.current) return;
+  /**
+   * The request goes out the moment the operator signs in and the coin plays
+   * out beside it, rather than the card stalling on an invented delay. A
+   * result that lands mid-drop is held until the coin has finished falling,
+   * so the sequence is never cut in half.
+   */
+  const authenticate = useCallback(
+    async (credentials: LoginCredentials) => {
+      const id = ++attemptId.current;
+      const startedAt = performance.now();
 
-    setPhase('authenticating');
-    try {
-      const auth = (await api.login(credentials.email, credentials.password)) as AuthResponse;
-      if (attempt !== attemptId.current) return;
-      if (credentials.rememberMe) localStorage.setItem('remembered_email', credentials.email.trim());
-      else localStorage.removeItem('remembered_email');
+      setFieldError(null);
+      setServerMessage('');
+      setPhase('inserting');
+      setAttempt((n) => n + 1);
 
-      setSignedInName(auth?.user?.full_name || auth?.user?.username || 'Operator');
-      setPhase('success');
-      redirectTimer.current = setTimeout(() => router.push('/'), REDIRECT_MS);
-    } catch (error) {
-      if (attempt !== attemptId.current) return;
-      const kind = error instanceof LoginError ? error.kind : 'server';
-      const messages = {
-        network: 'QuickWash could not be reached. Check your connection, then try again.',
-        timeout: 'The server took too long to respond. Wait a moment, then try again.',
-        credentials: 'The email or password is incorrect. Check your details and try again.',
-        server: 'Sign in is temporarily unavailable. Try again in a moment.',
-      } as const;
-      setServerMessage(messages[kind]);
-      setPhase(kind === 'credentials' ? 'jam' : 'error');
-    }
-  }, [router]);
+      if (progressTimer.current) clearInterval(progressTimer.current);
+      progressTimer.current = setInterval(() => {
+        if (id !== attemptId.current) return;
+        setPhase(phaseWhilePending(performance.now() - startedAt));
+      }, 80);
 
-  const handleSubmit = useCallback((credentials: LoginCredentials): FieldError | null => {
-    if (phase !== 'idle' && phase !== 'jam' && phase !== 'error') return null;
+      let kind: OutcomeKind = 'unknown';
+      let auth: AuthResponse | null = null;
+      try {
+        auth = (await api.login(credentials.email, credentials.password)) as AuthResponse;
+        kind = 'ok';
+      } catch (error) {
+        kind = error instanceof LoginError ? error.kind : 'server';
+      }
 
-    const problem = validateCredentials(credentials);
-    if (problem) {
-      setFieldError(problem);
-      return problem;
-    }
+      if (id !== attemptId.current) return;
+      stopProgress();
 
-    lastAttempt.current = credentials;
-    void authenticate(credentials);
-    return null;
-  }, [authenticate, phase]);
+      const elapsed = performance.now() - startedAt;
+      if (shouldHoldResult(elapsed)) {
+        setPhase(phaseWhilePending(elapsed));
+        await wait(COIN_INSERT_MS - elapsed);
+        if (id !== attemptId.current) return;
+      }
 
-  const handleRetry = useCallback(() => {
-    if (phase === 'inserting' || phase === 'authenticating' || !lastAttempt.current) return;
-    void authenticate(lastAttempt.current);
-  }, [authenticate, phase]);
+      const next = terminalPhase(kind);
+
+      if (next === 'success' && auth) {
+        if (credentials.rememberMe) localStorage.setItem('remembered_email', credentials.email.trim());
+        else localStorage.removeItem('remembered_email');
+
+        setSignedInName(auth?.user?.full_name || auth?.user?.username || 'Operator');
+        setPhase('success');
+        redirectTimer.current = setTimeout(() => router.push('/'), REDIRECT_MS);
+        return;
+      }
+
+      if (next === 'rejecting') {
+        setPhase('rejecting');
+        // The coin has to finish rattling and being thrown back out before the
+        // card settles and the form becomes editable again.
+        await wait(totalRejectMs());
+        if (id !== attemptId.current) return;
+        setServerMessage(messageFor('credentials'));
+        setPhase('jam');
+        return;
+      }
+
+      setServerMessage(messageFor(kind));
+      setPhase('error');
+    },
+    [router, stopProgress]
+  );
+
+  const handleSubmit = useCallback(
+    (credentials: LoginCredentials): FieldError | null => {
+      const problem = validateCredentials(credentials);
+      if (problem) {
+        setFieldError(problem);
+        return problem;
+      }
+
+      void authenticate(credentials);
+      return null;
+    },
+    [authenticate]
+  );
 
   const clearError = useCallback(() => {
     setFieldError(null);
-    if (phase === 'jam' || phase === 'error') setPhase('idle');
     setServerMessage('');
-  }, [phase]);
+    setPhase('idle');
+  }, []);
+
+  // Escape backs out of a settled failure so the operator is never trapped.
+  useEffect(() => {
+    if (phase !== 'jam' && phase !== 'error') return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') clearError();
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [phase, clearError]);
 
   return (
     <div className="login-scene">
@@ -132,29 +198,23 @@ export default function LoginPage() {
         <section id="login-panel" className="login-card" aria-labelledby="login-heading">
           <div className="login-card-header">
             <p className="login-kicker">Operator portal</p>
-            {phase === 'success' ? (
-              <>
-                <h2 id="login-heading">Welcome back</h2>
-                <p>Signed in as {signedInName}.</p>
-              </>
-            ) : (
-              <>
-                <h2 id="login-heading">Sign in</h2>
-                <p>Enter your details to access the operations hub.</p>
-              </>
-            )}
+            <h2 id="login-heading">Sign in</h2>
+            <p>Enter your details to access the operations hub.</p>
           </div>
 
-          {phase === 'success' ? (
-            <CoinSlotFeedback phase="success" signedInName={signedInName} />
-          ) : (
-            <CredentialForm
-              onSubmit={handleSubmit}
-              fieldError={fieldError}
-              serverMessage={serverMessage}
+          <CredentialForm
+            onSubmit={handleSubmit}
+            fieldError={fieldError}
+            notice={phase === 'jam' || phase === 'error' ? { phase, message: serverMessage } : null}
+            phase={phase}
+            onClearError={clearError}
+          />
+
+          {phase !== 'idle' && phase !== 'jam' && phase !== 'error' && (
+            <CoinSlotOverlay
+              key={attempt}
               phase={phase}
-              onRetry={handleRetry}
-              onClearError={clearError}
+              signedInName={signedInName}
             />
           )}
 
