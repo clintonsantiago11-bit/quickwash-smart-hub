@@ -64,16 +64,33 @@ export default function CoinSlotOverlay({ phase, signedInName = 'Operator' }: Co
         aria-describedby="slot-stage-detail"
       >
         <div className="slot-mech" aria-hidden="true">
-          <span className="slot-plate" />
-          <span className="slot-lip" />
-          <span className="slot-slotway">
-            <span className="slot-coin" />
-            <span className="slot-slit">
-              <span className="slot-beam" />
-              <span className="slot-blocker" />
+          <div className="slot-acceptor">
+            <span className="slot-screw slot-screw--tl" />
+            <span className="slot-screw slot-screw--tr" />
+            <span className="slot-screw slot-screw--bl" />
+            <span className="slot-screw slot-screw--br" />
+
+            <div className="slot-bezel">
+              <div className="slot-face">
+                <span className="slot-mouth" />
+                <span className="slot-slit">
+                  <span className="slot-beam" />
+                  <span className="slot-blocker" />
+                </span>
+              </div>
+            </div>
+
+            <span className="slot-led" />
+            <span className="slot-plunger" />
+            <span className="slot-engraving">Insert coin</span>
+          </div>
+
+          <div className="slot-slotway">
+            <span className="slot-coin">
+              <span className="slot-coin-face" />
+              <span className="slot-coin-back" />
             </span>
-          </span>
-          <span className="slot-lamp" />
+          </div>
         </div>
 
         <div className="slot-readout">

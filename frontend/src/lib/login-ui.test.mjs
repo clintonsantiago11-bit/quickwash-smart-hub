@@ -4,6 +4,19 @@ import { test } from 'node:test';
 
 const source = (relativePath) => readFileSync(new URL(relativePath, import.meta.url), 'utf8');
 
+/**
+ * Extracts one flat CSS rule by its exact opening selector. Slicing between
+ * two indexOf() calls is unsafe here because a combined selector such as
+ * ".a,\n.b {" also matches a search for ".b {", earlier in the file. Pass
+ * { last: true } when the standalone rule is shadowed by such a combined one.
+ */
+const ruleOf = (css, selector, { last = false } = {}) => {
+  const start = last ? css.lastIndexOf(selector) : css.indexOf(selector);
+  if (start < 0) return '';
+  const end = css.indexOf('\n}', start);
+  return end < 0 ? '' : css.slice(start, end + 2);
+};
+
 test('login uses plain product copy without fake coin-terminal language', () => {
   const page = source('../app/login/page.tsx');
   const form = source('../components/login/CredentialForm.tsx');
@@ -54,7 +67,7 @@ test('the coin mechanism covers the screen as a card-sized modal dialog', () => 
   assert.match(styles, /\.slot-stage\s*\{[\s\S]*?width: min\(100%, 25\.5rem\)/);
 });
 
-test('the coin is a plain blue disc clipped by the slotway', () => {
+test('the coin is a struck gold disc clipped by the slotway', () => {
   const overlay = source('../components/login/CoinSlotOverlay.tsx');
   const styles = source('../app/globals.css');
 
@@ -63,16 +76,88 @@ test('the coin is a plain blue disc clipped by the slotway', () => {
   assert.match(overlay, /className="slot-slotway"[\s\S]*?className="slot-coin"/);
   assert.match(styles, /\.slot-slotway\s*\{[\s\S]*?overflow: hidden;/);
 
-  // A blue circle, not a decorated token.
-  const coin = styles.slice(styles.indexOf('.slot-coin {'), styles.indexOf('.slot-coin::after'));
-  assert.match(coin, /border-radius: 50%/);
-  assert.match(coin, /radial-gradient\(circle at 36% 30%, #A5E4FF/);
-  assert.match(coin, /width: 5\.2rem;\s*\n\s*height: 5\.2rem;/);
+  const coin = ruleOf(styles, '.slot-coin {');
+  assert.match(coin, /width: 5\.4rem;\s*\n\s*height: 5\.4rem;/);
+  assert.match(coin, /transform-style: preserve-3d;/);
 
-  // The slit is cut into a metal faceplate with a bright lip over it.
-  assert.match(overlay, /className="slot-plate"/);
-  assert.match(overlay, /className="slot-lip"/);
-  assert.match(overlay, /className="slot-slit"/);
+  // Gold, not the old cyan sphere.
+  const face = ruleOf(styles, '.slot-coin-face {');
+  assert.match(face, /radial-gradient\(circle at 42% 34%, #F7D278/);
+  assert.doesNotMatch(`${coin}${face}`, /#A5E4FF|#0EA5E9/);
+
+  // Two faces held apart in 3D, so the coin still shows an edge at the
+  // halfway point of the flip instead of collapsing to a hairline.
+  assert.match(face, /transform: translateZ\(2px\)/);
+  assert.match(styles, /\.slot-coin-face,\s*\n\.slot-coin-back \{[\s\S]*?backface-visibility: hidden;/);
+  assert.match(ruleOf(styles, '.slot-coin-back {', { last: true }), /transform: rotateY\(180deg\) translateZ\(2px\)/);
+  assert.match(overlay, /className="slot-coin-face" \/>/);
+  assert.match(overlay, /className="slot-coin-back" \/>/);
+
+  // A coin is flat with a raised rim, not a shaded sphere. The rim and the
+  // embossed droplet are what stop it reading as a ball.
+  const rim = ruleOf(styles, '.slot-coin-face::before {');
+  assert.match(rim, /inset 0 2px 0 rgba\(255, 240, 197/);
+  assert.match(rim, /inset 0 -2px 0 rgba\(86, 56, 6/);
+  const emblem = ruleOf(styles, '.slot-coin-face::after {');
+  assert.match(emblem, /border-radius: 50% 50% 50% 0/);
+  assert.match(emblem, /transform: rotate\(-45deg\)/);
+});
+
+
+test('the acceptor is drawn with a vertical slit, LED, plunger and engraving', () => {
+  const overlay = source('../components/login/CoinSlotOverlay.tsx');
+  const styles = source('../app/globals.css');
+
+  assert.match(overlay, /className="slot-acceptor"/);
+  assert.match(overlay, /slot-screw--tl/);
+  assert.match(overlay, /className="slot-bezel"/);
+  assert.match(overlay, /className="slot-face"/);
+  assert.match(overlay, /className="slot-led"/);
+  assert.match(overlay, /className="slot-plunger"/);
+  assert.match(overlay, /className="slot-engraving"/);
+
+  // A coin acceptor takes a coin through a narrow TALL slit. The old
+  // horizontal gap is a coin return and must not come back.
+  const slit = styles.slice(styles.indexOf('.slot-slit {'), styles.indexOf('.slot-beam {'));
+  assert.match(slit, /width: 1\.1rem;/);
+  assert.match(slit, /height: 4\.2rem;/);
+  assert.doesNotMatch(styles, /\.slot-plate|\.slot-lip/);
+
+  // The face panel is what occludes the coin below the mouth; without it
+  // the coin would be visible lying across the slit.
+  assert.match(styles, /\.slot-face\s*\{[\s\S]*?z-index: 3;/);
+
+  // Its transparent window has to be exactly as wide as the slit. A wider
+  // window leaves slivers beside the slit with the coin showing through.
+  const face = styles.slice(styles.indexOf('.slot-face {'), styles.indexOf('/* The bar the coin passes behind'));
+  const window = face.match(/transparent ([\d.]+)rem ([\d.]+)rem/);
+  assert.ok(window, 'the face needs a transparent window for the slit');
+  const windowWidth = Number(window[2]) - Number(window[1]);
+  assert.equal(
+    windowWidth,
+    1.1,
+    `the face window is ${windowWidth}rem but the slit is 1.1rem, so the coin leaks through`,
+  );
+
+  // The engraving is confined to the machine graphic, never to the product
+  // copy on the page or the form.
+  const page = source('../app/login/page.tsx');
+  const form = source('../components/login/CredentialForm.tsx');
+  assert.doesNotMatch(`${page}\n${form}`, /Insert coin/i);
+});
+
+test('the coin flips as it enters and tumbles back out when rejected', () => {
+  const styles = source('../app/globals.css');
+  assert.match(styles, /\.slot-mech \{[^}]*perspective: 700px;/);
+  assert.match(styles, /@keyframes slot-coin-feed \{[\s\S]*?rotateX\(360deg\)/);
+  assert.match(styles, /@keyframes slot-coin-return \{[\s\S]*?rotateX\(500deg\)/);
+  assert.match(styles, /@keyframes slot-plunger-fire/);
+  assert.match(styles, /@keyframes slot-beam-sweep/);
+
+  // The flip must land on a whole turn so the coin rests face-up showing its
+  // embossed emblem. Half a turn would leave it on its blank reverse.
+  assert.doesNotMatch(styles, /rotateX\(180deg\)/);
+  assert.doesNotMatch(styles, /rotateX\(150deg\)/);
 });
 
 test('a rejected credential catches the coin, returns it, then offers a retry', () => {

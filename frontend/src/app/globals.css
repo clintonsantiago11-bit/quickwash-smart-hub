@@ -1,4 +1,4 @@
-﻿@import "tailwindcss";
+@import "tailwindcss";
 
 @theme {
   --font-display: var(--font-ui), "Inter", sans-serif;
@@ -161,7 +161,7 @@
 }
 
 /* ============================================================
-   LOGIN â€” professional smart-facility access.
+   LOGIN — professional smart-facility access.
    ============================================================ */
 .login-scene {
   position: relative;
@@ -395,12 +395,11 @@
 .login-btn:focus-visible { outline: 3px solid rgba(103, 232, 249, 0.55); outline-offset: 3px; }
 .login-btn:disabled { cursor: wait; opacity: 0.72; }
 /* ============================================================
-   Coin reader â€” a full-screen scrim with the mechanism on a
-   card-sized stage in the middle. Built from scratch: a brushed
-   metal faceplate, a slit cut into it with a bright lip, a blue
-   coin that is clipped by the slotway so it is genuinely swallowed
-   rather than passing in front of the machine, a scan beam and a
-   status lamp.
+   Coin acceptor — a full-screen scrim with a stainless coin
+   acceptor on a card-sized stage. The signature of the real
+   hardware is a narrow VERTICAL slit, so that is what is drawn
+   here: a brushed housing, corner fasteners, a recessed bezel
+   with a coin channel, a status LED and a reject plunger.
    ============================================================ */
 .slot-scrim {
   position: fixed;
@@ -425,124 +424,258 @@
   outline: none;
   animation: slot-stage-in 300ms cubic-bezier(0.2, 0.8, 0.3, 1) both;
 }
+.slot-mech { position: relative; height: 15rem; perspective: 700px; }
 
-/* --- The machine --- */
-.slot-mech { position: relative; height: 15rem; }
-.slot-plate {
+/* --- Stainless housing --- */
+.slot-acceptor {
   position: absolute;
-  z-index: 1;
-  top: 3rem;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  border-radius: 1.15rem 1.15rem 0.85rem 0.85rem;
+  top: 2.2rem;
+  left: 50%;
+  width: 9.4rem;
+  height: 11.6rem;
+  margin-left: -4.7rem;
+  border-radius: 0.7rem;
   background:
-    linear-gradient(180deg, rgba(203, 226, 245, 0.16), rgba(203, 226, 245, 0) 26%),
-    linear-gradient(180deg, #16283C 0%, #0C1B2B 42%, #071220 100%);
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.035) 0 1px, transparent 1px 3px),
+    linear-gradient(100deg, #33475C 0%, #4C637A 18%, #2B3B4E 46%, #3E5266 74%, #22303F 100%);
   box-shadow:
-    inset 0 1px 0 rgba(203, 226, 245, 0.3),
-    inset 0 -20px 28px -20px rgba(0, 0, 0, 0.9),
-    0 14px 30px -18px rgba(0, 0, 0, 0.9);
+    inset 0 1px 0 rgba(226, 240, 252, 0.45),
+    inset 0 -2px 3px rgba(0, 0, 0, 0.55),
+    0 18px 34px -18px rgba(0, 0, 0, 0.95);
 }
-.slot-plate::before {
+.slot-acceptor::after {
   content: '';
   position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background: repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.03) 0 1px, transparent 1px 3px);
+  inset: 0.5rem;
+  border: 1px solid rgba(226, 240, 252, 0.14);
+  border-radius: 0.4rem;
 }
-/* The metal lip along the top of the slit, drawn over the coin so the coin
-   passes behind it the way it would on a real reader. */
-.slot-lip {
-  position: absolute;
-  z-index: 3;
-  top: 8rem;
-  left: 50%;
-  width: 12.6rem;
-  height: 0.55rem;
-  margin-left: -6.3rem;
-  border-radius: 0.55rem 0.55rem 0.2rem 0.2rem;
-  background: linear-gradient(180deg, #8FA9C2 0%, #456480 55%, #1C3044 100%);
-  box-shadow: 0 1px 0 rgba(226, 240, 252, 0.4), 0 2px 5px rgba(0, 0, 0, 0.6);
-}
-/* Clipping window: the coin cannot be seen below the bottom of the slit,
-   which is what makes it look swallowed. */
-.slot-slotway {
+/* Corner fasteners */
+.slot-screw {
   position: absolute;
   z-index: 2;
-  top: 0;
-  left: 50%;
-  width: 12rem;
-  height: 10.35rem;
-  margin-left: -6rem;
-  overflow: hidden;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: radial-gradient(circle at 34% 30%, #C3D2E0, #7C8FA3 55%, #3A4A5B 100%);
+  box-shadow: inset 0 0 0 1px rgba(10, 18, 28, 0.65), 0 1px 1px rgba(255, 255, 255, 0.18);
 }
+.slot-screw::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 12%;
+  width: 76%;
+  height: 1px;
+  margin-top: -0.5px;
+  background: rgba(20, 32, 45, 0.8);
+}
+.slot-screw--tl { top: 0.62rem; left: 0.62rem; }
+.slot-screw--tr { top: 0.62rem; right: 0.62rem; }
+.slot-screw--bl { bottom: 0.62rem; left: 0.62rem; }
+.slot-screw--br { bottom: 0.62rem; right: 0.62rem; }
+
+/* --- Recessed bezel that holds the coin channel --- */
+.slot-bezel {
+  position: absolute;
+  top: 1.2rem;
+  left: 50%;
+  width: 5.6rem;
+  height: 7.6rem;
+  margin-left: -2.8rem;
+  border-radius: 0.45rem;
+  background: linear-gradient(180deg, #101C28, #1B2B3B);
+  box-shadow:
+    inset 0 3px 7px rgba(0, 0, 0, 0.85),
+    inset 0 -1px 0 rgba(203, 226, 245, 0.22),
+    0 1px 0 rgba(226, 240, 252, 0.3);
+}
+
+/* --- Channel walls + slit. This panel is drawn OVER the coin, so the
+   coin is genuinely occluded from the mouth downward instead of
+   sliding in front of the machine. --- */
+.slot-face {
+  position: absolute;
+  z-index: 3;
+  top: 2.85rem;
+  left: 50%;
+  width: 3.9rem;
+  height: 4.2rem;
+  margin-left: -1.95rem;
+  /* The transparent window must be exactly the slit width, or the coin shows
+     through the slivers either side of the slit. */
+  background: linear-gradient(90deg, #16242F 0 1.4rem, transparent 1.4rem 2.5rem, #16242F 2.5rem 3.9rem);
+}
+/* The bar the coin passes behind at the top of the slit */
+.slot-mouth {
+  position: absolute;
+  top: -0.45rem;
+  left: -0.5rem;
+  right: -0.5rem;
+  height: 0.5rem;
+  border-radius: 0.25rem;
+  background: linear-gradient(180deg, #8FA9C2 0%, #4E6B85 45%, #263B4E 100%);
+  box-shadow: 0 1px 0 rgba(226, 240, 252, 0.45), 0 2px 4px rgba(0, 0, 0, 0.7);
+}
+/* The vertical slit itself. It spans the full height of the face so the coin
+   cannot leak through below where the dark interior ends. */
 .slot-slit {
   position: absolute;
-  top: 8.4rem;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  border-radius: 0.25rem 0.25rem 0.4rem 0.4rem;
-  background: linear-gradient(180deg, #01060B 0%, #051320 58%, #0B2437 100%);
-  box-shadow: inset 0 5px 10px rgba(0, 0, 0, 0.95), inset 0 -1px 0 rgba(103, 232, 249, 0.2);
+  top: 0;
+  left: 50%;
+  width: 1.1rem;
+  height: 4.2rem;
+  margin-left: -0.55rem;
+  overflow: hidden;
+  border-radius: 0.5rem 0.5rem 0.3rem 0.3rem;
+  background: linear-gradient(180deg, #01060B 0%, #051320 55%, #0A2133 100%);
+  box-shadow:
+    inset 2px 0 4px rgba(0, 0, 0, 0.95),
+    inset -2px 0 4px rgba(0, 0, 0, 0.95),
+    inset 0 -1px 0 rgba(103, 232, 249, 0.18);
 }
 .slot-beam {
   position: absolute;
   top: 0;
   bottom: 0;
-  left: -32%;
-  width: 32%;
+  left: -60%;
+  width: 60%;
   opacity: 0;
-  background: linear-gradient(90deg, transparent, rgba(165, 243, 252, 0.9), transparent);
+  background: linear-gradient(90deg, transparent, rgba(165, 243, 252, 0.95), transparent);
 }
 .slot-blocker {
   position: absolute;
-  top: 50%;
-  right: 9%;
-  left: 9%;
+  top: 0.5rem;
+  right: -0.35rem;
+  left: -0.35rem;
   height: 2px;
-  margin-top: -1px;
   opacity: 0;
   border-radius: 9999px;
   background: #F87171;
-  box-shadow: 0 0 10px rgba(248, 113, 113, 0.9);
-}
-.slot-lamp {
-  position: absolute;
-  z-index: 4;
-  left: 50%;
-  bottom: 1.6rem;
-  width: 0.7rem;
-  height: 0.7rem;
-  margin-left: -0.35rem;
-  border-radius: 50%;
-  background: #0E7490;
-  box-shadow: 0 0 0 3px rgba(7, 18, 32, 0.9), 0 0 10px rgba(34, 211, 238, 0.45);
-  transition: background 200ms ease, box-shadow 200ms ease;
+  box-shadow: 0 0 10px rgba(248, 113, 113, 0.95);
 }
 
-/* --- The coin: a blue disc, nothing more --- */
+/* Clipping window: the coin cannot be seen wider than the channel, and
+   cannot be seen below the bottom of the slit. */
+.slot-slotway {
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  left: 50%;
+  width: 3.9rem;
+  height: 10.45rem;
+  margin-left: -1.95rem;
+  overflow: hidden;
+}
+
+/* --- The coin: a struck gold disc, flat field + raised rim + emblem.
+   Two faces held apart in 3D so the coin still has a visible edge at the
+   halfway point of the flip. A single flat face would collapse to a
+   hairline at 90 degrees and appear to vanish. --- */
 .slot-coin {
   position: absolute;
   top: 0;
   left: 50%;
-  width: 5.2rem;
-  height: 5.2rem;
-  margin-left: -2.6rem;
-  border-radius: 50%;
-  background: radial-gradient(circle at 36% 30%, #A5E4FF 0 10%, #4CC3F5 11% 32%, #0EA5E9 33% 58%, #0284C7 59% 80%, #0C4A6E 81% 100%);
-  box-shadow:
-    0 0 0 2px rgba(186, 240, 255, 0.5),
-    0 0 26px rgba(14, 165, 233, 0.5),
-    inset 0 -4px 10px rgba(2, 32, 52, 0.5);
+  width: 5.4rem;
+  height: 5.4rem;
+  margin-left: -2.7rem;
+  transform-style: preserve-3d;
 }
-.slot-coin::after {
+.slot-coin-face,
+.slot-coin-back {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  backface-visibility: hidden;
+  box-shadow: 0 0 0 1px rgba(122, 82, 12, 0.9), 0 0 18px rgba(217, 154, 43, 0.3);
+}
+.slot-coin-face {
+  transform: translateZ(2px);
+  background:
+    linear-gradient(150deg, rgba(255, 248, 214, 0.75) 0 8%, transparent 34%),
+    radial-gradient(circle at 42% 34%, #F7D278 0%, #E5B23C 34%, #CE9420 62%, #9E6A0C 84%, #6E4A08 100%);
+}
+/* The reverse of a real coin is plain, which is what shows mid-flip. */
+.slot-coin-back {
+  transform: rotateY(180deg) translateZ(2px);
+  background: radial-gradient(circle at 58% 66%, #E0AE3E 0%, #C08F1C 38%, #96650B 72%, #6E4A08 100%);
+  box-shadow:
+    inset 0 0 0 1px rgba(122, 82, 12, 0.9),
+    inset 0 2px 0 rgba(255, 240, 197, 0.3),
+    inset 0 -2px 0 rgba(86, 56, 6, 0.5),
+    0 0 18px rgba(217, 154, 43, 0.25);
+}
+/* Raised rim: lit on top, shadowed underneath, so the face sits proud. */
+.slot-coin-face::before {
   content: '';
   position: absolute;
-  inset: 0.7rem;
-  border: 1px solid rgba(186, 240, 255, 0.3);
+  inset: 0.34rem;
   border-radius: 50%;
+  border: 1px solid rgba(94, 62, 8, 0.55);
+  box-shadow:
+    inset 0 2px 0 rgba(255, 240, 197, 0.55),
+    inset 0 -2px 0 rgba(86, 56, 6, 0.5),
+    0 0 0 1px rgba(255, 240, 197, 0.22);
+}
+/* QuickWash droplet, embossed into the field. */
+.slot-coin-face::after {
+  content: '';
+  position: absolute;
+  top: 1.5rem;
+  left: 1.62rem;
+  width: 2.16rem;
+  height: 2.16rem;
+  border-radius: 50% 50% 50% 0;
+  background: linear-gradient(140deg, rgba(120, 82, 12, 0.85), rgba(78, 50, 6, 0.9));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 240, 197, 0.35),
+    0 1px 0 rgba(255, 240, 197, 0.3);
+  transform: rotate(-45deg);
+}
+
+/* --- Indicator LED beside the slit --- */
+.slot-led {
+  position: absolute;
+  z-index: 2;
+  top: 5.5rem;
+  right: 0.95rem;
+  width: 0.62rem;
+  height: 0.62rem;
+  border-radius: 50%;
+  background: #0E7490;
+  box-shadow: 0 0 0 2px rgba(12, 22, 34, 0.9), 0 0 9px rgba(34, 211, 238, 0.4);
+  transition: background 200ms ease, box-shadow 200ms ease;
+}
+/* --- Reject plunger below the slit --- */
+.slot-plunger {
+  position: absolute;
+  z-index: 2;
+  top: 9.35rem;
+  left: 50%;
+  width: 1.5rem;
+  height: 1.5rem;
+  margin-left: -0.75rem;
+  border-radius: 50%;
+  background: radial-gradient(circle at 36% 30%, #E2ECF5 0%, #9FB2C4 40%, #4A5D70 78%, #24323F 100%);
+  box-shadow:
+    0 0 0 2px rgba(10, 18, 28, 0.85),
+    0 2px 4px rgba(0, 0, 0, 0.7),
+    inset 0 -2px 3px rgba(0, 0, 0, 0.45);
+}
+.slot-engraving {
+  position: absolute;
+  z-index: 2;
+  top: 11rem;
+  left: 50%;
+  width: 7rem;
+  margin-left: -3.5rem;
+  color: rgba(12, 22, 34, 0.85);
+  font-size: 0.5rem;
+  font-weight: 800;
+  letter-spacing: 0.34em;
+  text-align: center;
+  text-transform: uppercase;
+  text-shadow: 0 1px 0 rgba(226, 240, 252, 0.4);
 }
 
 /* --- Readout --- */
@@ -550,45 +683,51 @@
 .slot-readout-title { color: #CFFAFE; font-size: 1rem; font-weight: 800; }
 .slot-readout-detail { margin-top: 0.35rem; color: #8FA5B9; font-size: 0.8125rem; line-height: 1.5; }
 
-/* --- inserting: the coin is fed down into the slit --- */
-.slot-scrim[data-phase='inserting'] .slot-coin { animation: slot-coin-feed 520ms cubic-bezier(0.45, 0, 0.7, 0.5) both; }
+/* --- inserting: the coin is fed down into the channel and flips over --- */
+.slot-scrim[data-phase='inserting'] .slot-coin { animation: slot-coin-feed 520ms cubic-bezier(0.4, 0, 0.6, 1) both; }
 @keyframes slot-coin-feed {
-  0% { top: -1.5rem; opacity: 0; }
+  0% { top: -1.2rem; opacity: 0; transform: rotateX(0deg); }
   14% { opacity: 1; }
-  74% { top: 6rem; }
-  100% { top: 6.4rem; opacity: 1; }
+  74% { top: 4.5rem; transform: rotateX(268deg); }
+  100% { top: 4.9rem; opacity: 1; transform: rotateX(360deg); }
 }
 
-/* --- authenticating: the coin sits in the reader and is scanned --- */
-.slot-scrim[data-phase='authenticating'] .slot-coin { top: 9.2rem; }
-.slot-scrim[data-phase='authenticating'] .slot-beam { opacity: 1; animation: slot-beam-sweep 900ms linear infinite; }
-.slot-scrim[data-phase='authenticating'] .slot-lamp { background: #22D3EE; box-shadow: 0 0 0 3px rgba(7, 18, 32, 0.9), 0 0 16px rgba(34, 211, 238, 0.85); animation: slot-lamp-pulse 1.1s ease-in-out infinite; }
+/* --- authenticating: the coin is in the reader and being scanned --- */
+.slot-scrim[data-phase='authenticating'] .slot-coin { top: 6.5rem; transform: rotateX(360deg); }
+.slot-scrim[data-phase='authenticating'] .slot-beam { opacity: 1; animation: slot-beam-sweep 780ms linear infinite; }
+.slot-scrim[data-phase='authenticating'] .slot-led { background: #22D3EE; box-shadow: 0 0 0 2px rgba(12, 22, 34, 0.9), 0 0 15px rgba(34, 211, 238, 0.9); animation: slot-led-pulse 1.1s ease-in-out infinite; }
 @keyframes slot-beam-sweep { to { left: 100%; } }
-@keyframes slot-lamp-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.42; } }
+@keyframes slot-led-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.42; } }
 
-/* --- rejecting: the coin catches at the mouth, rattles, then is returned.
-   Rattle and return are separate animations on separate properties so they
-   can run one after the other on the same disc. --- */
+/* --- rejecting: the coin catches in the mouth, the plunger fires, and the
+   coin is returned. Catch and return are separate animations on separate
+   properties so they run one after the other on the same disc. --- */
 .slot-scrim[data-phase='rejecting'] { background: rgba(24, 6, 9, 0.82); }
 .slot-scrim[data-phase='rejecting'] .slot-stage { animation: slot-stage-in 300ms cubic-bezier(0.2, 0.8, 0.3, 1) both, slot-stage-shake 300ms ease-in-out 1; }
-.slot-scrim[data-phase='rejecting'] .slot-plate { box-shadow: inset 0 1px 0 rgba(248, 113, 113, 0.4), inset 0 -20px 28px -20px rgba(0, 0, 0, 0.9), 0 0 34px -12px rgba(248, 113, 113, 0.7); }
+.slot-scrim[data-phase='rejecting'] .slot-acceptor { box-shadow: inset 0 1px 0 rgba(248, 113, 113, 0.45), inset 0 -2px 3px rgba(0, 0, 0, 0.55), 0 0 38px -12px rgba(248, 113, 113, 0.8); }
 .slot-scrim[data-phase='rejecting'] .slot-blocker { opacity: 1; }
-.slot-scrim[data-phase='rejecting'] .slot-lamp { background: #F87171; box-shadow: 0 0 0 3px rgba(7, 18, 32, 0.9), 0 0 18px rgba(248, 113, 113, 0.9); }
+.slot-scrim[data-phase='rejecting'] .slot-led { background: #F87171; box-shadow: 0 0 0 2px rgba(12, 22, 34, 0.9), 0 0 16px rgba(248, 113, 113, 0.95); }
+.slot-scrim[data-phase='rejecting'] .slot-plunger { animation: slot-plunger-fire 200ms ease-in both; }
 .slot-scrim[data-phase='rejecting'] .slot-coin {
-  top: 5.2rem;
+  top: 4.2rem;
   animation: slot-coin-catch 280ms ease-in-out 1, slot-coin-return 420ms cubic-bezier(0.4, 0, 0.7, 1) 280ms both;
 }
+@keyframes slot-plunger-fire {
+  0% { box-shadow: 0 0 0 2px rgba(10, 18, 28, 0.85), 0 2px 4px rgba(0, 0, 0, 0.7), inset 0 -2px 3px rgba(0, 0, 0, 0.45); }
+  40% { transform: scale(0.88); box-shadow: 0 0 0 2px rgba(10, 18, 28, 0.85), 0 0 0 rgba(0, 0, 0, 0), inset 0 3px 6px rgba(0, 0, 0, 0.75); }
+  100% { transform: none; }
+}
 @keyframes slot-coin-catch {
-  0% { transform: translateX(0) rotate(0deg); }
-  25% { transform: translateX(-3px) rotate(15deg); }
-  55% { transform: translateX(3px) rotate(11deg); }
-  80% { transform: translateX(-1px) rotate(14deg); }
-  100% { transform: translateX(0) rotate(14deg); }
+  0% { transform: rotateX(360deg); }
+  25% { transform: translateX(-2px) rotateX(376deg); }
+  55% { transform: translateX(2px) rotateX(346deg); }
+  80% { transform: translateX(-1px) rotateX(364deg); }
+  100% { transform: rotateX(360deg); }
 }
 @keyframes slot-coin-return {
-  0% { top: 5.2rem; opacity: 1; transform: translateX(0) rotate(14deg); }
-  40% { top: 4.2rem; opacity: 1; transform: translateX(0) rotate(-6deg); }
-  100% { top: -1.2rem; opacity: 0; transform: translateX(0) rotate(-14deg); }
+  0% { top: 4.2rem; opacity: 1; transform: rotateX(360deg); }
+  40% { top: 5rem; opacity: 1; transform: rotateX(404deg); }
+  100% { top: -1.4rem; opacity: 0; transform: rotateX(500deg); }
 }
 @keyframes slot-stage-shake {
   0%, 100% { transform: translateX(0); }
@@ -598,11 +737,11 @@
 
 /* --- success: accepted --- */
 .slot-scrim[data-phase='success'] { background: rgba(3, 20, 16, 0.82); }
-.slot-scrim[data-phase='success'] .slot-plate { box-shadow: inset 0 1px 0 rgba(52, 211, 153, 0.45), inset 0 -20px 28px -20px rgba(0, 0, 0, 0.9), 0 0 34px -10px rgba(52, 211, 153, 0.8); }
-.slot-scrim[data-phase='success'] .slot-lamp { background: #34D399; box-shadow: 0 0 0 3px rgba(7, 18, 32, 0.9), 0 0 20px rgba(52, 211, 153, 0.95); }
+.slot-scrim[data-phase='success'] .slot-acceptor { box-shadow: inset 0 1px 0 rgba(52, 211, 153, 0.5), inset 0 -2px 3px rgba(0, 0, 0, 0.55), 0 0 38px -10px rgba(52, 211, 153, 0.85); }
+.slot-scrim[data-phase='success'] .slot-led { background: #34D399; box-shadow: 0 0 0 2px rgba(12, 22, 34, 0.9), 0 0 18px rgba(52, 211, 153, 0.95); }
 .slot-scrim[data-phase='success'] .slot-coin { animation: slot-coin-accept 420ms ease-in 120ms both; }
 @keyframes slot-coin-accept {
-  0% { top: 9.2rem; opacity: 1; }
+  0% { top: 6.5rem; opacity: 1; }
   100% { top: 10.4rem; opacity: 0; }
 }
 @keyframes slot-scrim-in { from { opacity: 0; } to { opacity: 1; } }
@@ -672,11 +811,12 @@
   .slot-stage,
   .slot-coin,
   .slot-beam,
-  .slot-lamp,
+  .slot-led,
+  .slot-plunger,
   .slot-notice { animation: none !important; transition: none !important; }
-  .slot-scrim[data-phase='inserting'] .slot-coin { top: 6.4rem; }
-  .slot-scrim[data-phase='authenticating'] .slot-beam { left: 36%; opacity: 0.6; }
-  .slot-scrim[data-phase='authenticating'] .slot-coin { top: 9.2rem; }
-  .slot-scrim[data-phase='rejecting'] .slot-coin { top: 5.2rem; transform: rotate(14deg); }
+  .slot-scrim[data-phase='inserting'] .slot-coin { top: 4.9rem; transform: rotateX(360deg); }
+  .slot-scrim[data-phase='authenticating'] .slot-beam { left: 20%; opacity: 0.6; }
+  .slot-scrim[data-phase='authenticating'] .slot-coin { top: 6.5rem; transform: rotateX(360deg); }
+  .slot-scrim[data-phase='rejecting'] .slot-coin { top: 4.2rem; transform: rotateX(360deg); }
   .slot-scrim[data-phase='success'] .slot-coin { top: 10.4rem; opacity: 0; }
 }
