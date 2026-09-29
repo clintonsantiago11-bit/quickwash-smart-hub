@@ -14,6 +14,13 @@ import { NextResponse, type NextRequest } from 'next/server';
  * Public paths (no auth required): /login, all /api/* routes, and static
  * assets.
  */
+/**
+ * Assets served from this origin that must stay reachable before sign-in.
+ * Matched as whole file extensions rather than "contains a dot", which
+ * would let any path with a dot in it past the gate.
+ */
+const PUBLIC_ASSET = /\.(?:png|jpe?g|gif|webp|svg|ico|css|js|mjs|map|json|txt|xml|webmanifest|woff2?)$/i;
+
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
@@ -23,7 +30,7 @@ export function middleware(request: NextRequest) {
     pathname.startsWith('/api') ||
     pathname.startsWith('/_next') ||
     pathname === '/favicon.ico' ||
-    pathname.includes('.')
+    PUBLIC_ASSET.test(pathname)
   ) {
     return NextResponse.next();
   }

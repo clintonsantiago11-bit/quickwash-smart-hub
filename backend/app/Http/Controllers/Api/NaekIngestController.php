@@ -15,14 +15,33 @@ use Illuminate\Support\Facades\Log;
  *
  * The agent runs on the carwash PC (outbound HTTPS only) and pushes
  * NAEK page snapshots + sale events here. Auth is a shared API key
- * header (x-api-key) configured via NAEK_INGEST_KEY on BOTH sides.
+ * header (x-api-key) compared against NAEK_INGEST_KEY, which must be set
+ * on BOTH sides. The endpoint refuses to serve traffic if the key is
+ * missing on the API host rather than falling back to a default.
  */
 class NaekIngestController extends Controller
 {
     public function store(Request $request)
     {
-        $expected = (string) config('services.naek.ingest_key', env('NAEK_INGEST_KEY', 'quickwash-bridge-key'));
-        if ($expected !== '' && $request->header('x-api-key') !== $expected) {
+        $expected = (string) config('services.naek.ingest_key', '');
+
+        // Fail closed. An unset or blank key must never silently open this
+        // endpoint: it is unauthenticated by design, and anyone who can reach
+        // it can write sale telemetry straight into the revenue tables. There
+        // is deliberately no default value to fall back on.
+        if ($expected === '') {
+            Log::error('NAEK ingest rejected: NAEK_INGEST_KEY is not configured on the API host.');
+
+            return response()->json([
+                'error' => ['code' => 'MISCONFIGURED', 'message' => 'Ingest is not configured on this server.'],
+            ], 500);
+        }
+
+        // Constant-time compare so the key cannot be recovered by timing the
+        // response. hash_equals() is the only safe choice for a shared secret.
+        if (!hash_equals($expected, (string) $request->header('x-api-key', ''))) {
+            Log::warning('NAEK ingest rejected: invalid API key from ' . $request->ip());
+
             return response()->json(['error' => ['code' => 'UNAUTHORIZED', 'message' => 'Invalid API key']], 401);
         }
 

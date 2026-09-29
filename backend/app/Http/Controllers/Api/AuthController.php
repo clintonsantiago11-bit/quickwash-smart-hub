@@ -70,6 +70,10 @@ class AuthController extends Controller
 
         $token = $user->createToken('quickwash-token')->plainTextToken;
 
+        // Stamped on every sign-in so the profile can show when the operator
+        // was last seen, instead of the placeholder the UI used to render.
+        $user->forceFill(['last_login_at' => Carbon::now()])->save();
+
         AuditLog::create([
             'user_id' => $user->id,
             'user' => $user->full_name,

@@ -10,22 +10,37 @@ class User extends Authenticatable
 {
     use HasApiTokens, Notifiable;
 
+    /**
+     * Only the columns a user is allowed to change about themselves. Role,
+     * facility_id, username and password_hash are deliberately absent: they
+     * are privilege and identity columns, set only by the seeder or an
+     * explicit assignment, never by request input.
+     */
     protected $fillable = [
-        'username',
         'full_name',
         'email',
-        'password_hash',
-        'role',
-        'facility_id',
-        'avatar_url',
         'phone',
         'designation',
+        'avatar_url',
+        'timezone',
+        'locale',
         'is_dark_mode',
         'email_alerts',
     ];
 
     protected $hidden = [
         'password_hash',
+    ];
+
+    /**
+     * Without these, last_login_at arrives as a raw string and the booleans
+     * as 0/1, which the profile DTO then tries to format as a date.
+     */
+    protected $casts = [
+        'last_login_at' => 'datetime',
+        'is_dark_mode' => 'boolean',
+        'email_alerts' => 'boolean',
+        'facility_id' => 'integer',
     ];
 
     public function getAuthPassword()

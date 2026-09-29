@@ -23,6 +23,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/profile', [ProfileController::class, 'show']);
     Route::put('/profile', [ProfileController::class, 'update'])->middleware('throttle:30,1');
     Route::put('/profile/preferences', [ProfileController::class, 'updatePreferences'])->middleware('throttle:30,1');
+    Route::put('/profile/password', [ProfileController::class, 'changePassword'])->middleware('throttle:5,1');
+    Route::post('/profile/avatar', [ProfileController::class, 'uploadAvatar'])->middleware('throttle:10,1');
+    Route::get('/profile/activity', [ProfileController::class, 'activity']);
+    Route::get('/profile/facilities', [ProfileController::class, 'facilities']);
 
     Route::get('/devices', [DeviceController::class, 'index']);
     Route::get('/devices/{device}', [DeviceController::class, 'show']);

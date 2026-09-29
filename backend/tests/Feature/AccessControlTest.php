@@ -10,14 +10,21 @@ class AccessControlTest extends TestCase
 {
     private function makeUser(string $role): User
     {
-        return User::create([
+        $user = new User();
+
+        // forceFill, not create(): role, username and password_hash are not
+        // mass-assignable, which is the point — a test fixture setting them
+        // has to say so explicitly, the same way a real admin flow would.
+        $user->forceFill([
             'username' => 'tester_' . $role . '_' . uniqid(),
             'full_name' => 'Test ' . $role,
             'email' => 'tester_' . $role . '_' . uniqid() . '@example.com',
             'password_hash' => Hash::make('password123'),
             'role' => $role,
             'facility_id' => 1,
-        ]);
+        ])->save();
+
+        return $user;
     }
 
     public function test_technician_cannot_update_vending_settings(): void

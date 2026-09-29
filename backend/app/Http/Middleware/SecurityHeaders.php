@@ -7,52 +7,39 @@ use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * Security headers for every response. These close common browser-side
- * attack surfaces (XSS via CSP, clickjacking via X-Frame-Options, MIME
- * sniffing, HTTPS downgrade via HSTS) and mirror the headers set on the
- * Next.js frontend.
+ * Security headers on every API response.
+ *
+ * This API only ever returns JSON and proxied camera bytes, so the policy is
+ * deliberately locked down: nothing may be loaded or framed from this origin.
+ * That is the strongest mitigation for the fact that the dashboard keeps its
+ * bearer token in localStorage — a token stolen by XSS still cannot be
+ * exfiltrated to an attacker's origin, because the API refuses to load
+ * anything at all.
+ *
+ * CORS is NOT handled here. config/cors.php owns the origin allowlist, and
+ * this middleware deliberately passes OPTIONS through so Laravel's CORS
+ * handler can answer the preflight. Duplicating that logic in two places is
+ * how the two drifted apart previously.
  */
 class SecurityHeaders
 {
     public function handle(Request $request, Closure $next): Response
     {
-        $origin = $request->header('Origin');
-        $isAllowed = $origin && (
-            preg_match('/^https:\/\/.*\.vercel\.app$/', $origin) ||
-            preg_match('/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/', $origin) ||
-            $origin === env('FRONTEND_URL')
-        );
-
-        if ($request->isMethod('OPTIONS')) {
-            $preflight = response('', 204);
-            if ($isAllowed) {
-                $preflight->headers->set('Access-Control-Allow-Origin', $origin);
-                $preflight->headers->set('Access-Control-Allow-Credentials', 'true');
-                $preflight->headers->set('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
-                $preflight->headers->set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
-                $preflight->headers->set('Access-Control-Max-Age', '86400');
-            }
-            return $preflight;
-        }
-
         $response = $next($request);
 
-        $isProd = app()->environment('production');
-
+        // JSON API: no scripts, styles, frames, images or connections may be
+        // loaded from this origin, by this origin's own pages or anyone else's.
+        $response->headers->set(
+            'Content-Security-Policy',
+            "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'; sandbox"
+        );
         $response->headers->set('X-Content-Type-Options', 'nosniff');
-        $response->headers->set('X-Frame-Options', 'SAMEORIGIN');
-        $response->headers->set('Referrer-Policy', 'strict-origin-when-cross-origin');
-        $response->headers->set('Permissions-Policy', 'camera=(self), microphone=(), geolocation=()');
+        // An API is never legitimately framed by the dashboard.
+        $response->headers->set('X-Frame-Options', 'DENY');
+        $response->headers->set('Referrer-Policy', 'no-referrer');
+        $response->headers->set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
 
-        $origin = $request->header('Origin');
-        if ($origin && (preg_match('/^https:\/\/.*\.vercel\.app$/', $origin) || preg_match('/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/', $origin))) {
-            $response->headers->set('Access-Control-Allow-Origin', $origin);
-            $response->headers->set('Access-Control-Allow-Credentials', 'true');
-            $response->headers->set('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
-            $response->headers->set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
-        }
-
-        if ($isProd) {
+        if (app()->environment('production')) {
             $response->headers->set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
         }
 

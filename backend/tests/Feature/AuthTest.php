@@ -34,10 +34,33 @@ class AuthTest extends TestCase
 
     public function test_security_headers_are_present(): void
     {
-        $this->getJson('/api/health')
+        $response = $this->getJson('/api/health')
             ->assertHeader('X-Content-Type-Options', 'nosniff')
-            ->assertHeader('X-Frame-Options', 'SAMEORIGIN')
-            ->assertHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+            ->assertHeader('X-Frame-Options', 'DENY')
+            ->assertHeader('Referrer-Policy', 'no-referrer');
+
+        // The API serves only JSON, so it must not be able to load or frame
+        // anything at all. This is the mitigation for the dashboard keeping its
+        // bearer token in localStorage.
+        $csp = (string) $response->headers->get('Content-Security-Policy');
+        $this->assertStringContainsString("default-src 'none'", $csp);
+        $this->assertStringContainsString("frame-ancestors 'none'", $csp);
+    }
+
+    public function test_sign_in_stamps_last_login_at(): void
+    {
+        $admin = \App\Models\User::where('email', 'admin@quickwash.hub')->firstOrFail();
+        $admin->forceFill(['last_login_at' => null])->save();
+
+        $this->postJson('/api/auth/login', [
+            'email' => 'admin@quickwash.hub',
+            'password' => 'admin123',
+        ])->assertStatus(200);
+
+        $this->assertNotNull(
+            $admin->fresh()->last_login_at,
+            'a successful sign-in must record when it happened',
+        );
     }
 
     public function test_health_endpoint_is_public(): void

@@ -62,15 +62,19 @@ class ApiClient {
     options: RequestInit = {},
     opts: { skipAuthRedirect?: boolean; timeoutMs?: number } = {}
   ) {
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-      ...(options.headers as Record<string, string> || {}),
-    };
+    // A FormData body must go out untouched, and Content-Type has to be left
+    // alone so the browser can add the multipart boundary. Setting it by hand
+    // produces a request the server cannot parse.
+    const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData;
+
+    const headers: Record<string, string> = { Accept: 'application/json' };
+    if (!isFormData) headers['Content-Type'] = 'application/json';
+    Object.assign(headers, { ...(options.headers as Record<string, string> | undefined) });
 
     if (this.token) {
       headers['Authorization'] = `Bearer ${this.token}`;
     }
+
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), opts.timeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS);
@@ -133,11 +137,17 @@ class ApiClient {
     return this.request(path);
   }
 
-  post(path: string, data?: Record<string, unknown>, opts: { skipAuthRedirect?: boolean; timeoutMs?: number } = {}) {
-    return this.request(path, {
-      method: 'POST',
-      body: data ? JSON.stringify(data) : undefined,
-    }, opts);
+  post(
+    path: string,
+    data?: Record<string, unknown>,
+    opts: { skipAuthRedirect?: boolean; timeoutMs?: number; form?: FormData } = {}
+  ) {
+    const { form, ...rest } = opts;
+    return this.request(
+      path,
+      { method: 'POST', body: form ?? (data ? JSON.stringify(data) : undefined) },
+      rest
+    );
   }
 
   put(path: string, data?: Record<string, unknown>) {
@@ -198,6 +208,16 @@ class ApiClient {
   getProfile() { return this.get('/profile'); }
   updateProfile(data: Record<string, unknown>) { return this.put('/profile', data); }
   updatePreferences(data: Record<string, unknown>) { return this.put('/profile/preferences', data); }
+  changePassword(data: { current_password: string; password: string; password_confirmation: string }) {
+    return this.put('/profile/password', data);
+  }
+  getProfileActivity(limit = 10) { return this.get(`/profile/activity?limit=${limit}`); }
+  getFacilities() { return this.get('/profile/facilities'); }
+  uploadAvatar(file: File) {
+    const form = new FormData();
+    form.append('avatar', file);
+    return this.post('/profile/avatar', undefined, { form });
+  }
 
   // Devices
   getDevices() { return this.get('/devices'); }
