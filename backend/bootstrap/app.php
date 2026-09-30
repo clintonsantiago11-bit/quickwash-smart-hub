@@ -4,6 +4,7 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use App\Http\Middleware\CheckRole;
+use App\Http\Middleware\AllowVercelPreviewOrigins;
 use App\Http\Middleware\SecurityHeaders;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Http\Request;
@@ -20,6 +21,12 @@ return Application::configure(basePath: __DIR__.'/..')
         $middleware->redirectGuestsTo(fn () => '/');
         // Security headers on every response (CSP/HSTS/X-Frame-Options/etc.)
         $middleware->prependToGroup('api', SecurityHeaders::class);
+
+        // Vercel preview deployments get a fresh hashed origin on every push
+        // and cannot be listed in config/cors.php ahead of time. This has to
+        // sit before HandleCors so it can add the header the CORS service
+        // drops the pattern for. See the middleware for why it is not config.
+        $middleware->prepend(AllowVercelPreviewOrigins::class);
     })
     ->withExceptions(function (Exceptions $exceptions) {
         $exceptions->render(function (AuthenticationException $e, Request $request) {
