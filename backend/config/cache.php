@@ -1,27 +1,26 @@
 <?php
 
+/*
+| The sign-in brute-force lockout keeps its counters in the cache, so the cache
+| store is a security setting, not a performance one. A file-backed cache lives
+| on the container's filesystem, which on Render is ephemeral: every deploy,
+| restart or spin-down wipes the counters and hands an attacker a fresh set of
+| attempts while the lockout still looks like it is working.
+|
+| So the store is chosen here rather than trusted from the environment. Setting
+| CACHE_DRIVER=file in production is overridden, because a deployment should
+| not be able to silently disable brute-force protection.
+*/
+
+$configured = env('CACHE_DRIVER', 'database');
+
+$default = ($configured === 'file' && env('APP_ENV') === 'production')
+    ? 'database'
+    : $configured;
+
 return [
 
-    /*
-    |--------------------------------------------------------------------------
-    | Default Cache Store
-    |--------------------------------------------------------------------------
-    |
-    | The database store is the default on purpose.
-    |
-    | The sign-in brute-force lockout keeps its state in the cache, so this is
-    | not a performance setting. A file-backed cache lives on the container's
-    | filesystem, which on Render is ephemeral: every deploy, restart or spin
-    | down throws the lockout counters away and hands an attacker a fresh set
-    | of attempts. The cache tables already exist, so the database store works
-    | with no extra migration.
-    |
-    | If CACHE_DRIVER is explicitly set in the environment it still wins, so
-    | the deployment must not pin this to "file".
-    |
-    */
-
-    'default' => env('CACHE_DRIVER', 'database'),
+    'default' => $default,
 
     'stores' => [
 
