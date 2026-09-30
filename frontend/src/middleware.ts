@@ -1,6 +1,19 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { buildCsp, staticSecurityHeaders } from '@/lib/security-headers';
 
+/**
+ * Server-side auth guard for the QuickWash Smart Hub.
+ *
+ * Redirects unauthenticated requests to /login BEFORE any page renders,
+ * preventing a flash of the dashboard on a fresh session. This gate is a UX
+ * courtesy — the REAL auth is the Sanctum Bearer token (stored in
+ * localStorage by src/lib/api.ts and sent on every API call). Auth state for
+ * the gate is carried in the `qhs_session` cookie, set by the frontend on its
+ * own origin at login (see src/lib/api.ts), so it works regardless of where
+ * the API is hosted.
+ *
+ * Public paths (no auth required): /login, all /api/* routes, and static
+ * assets.
+ */
 /**
  * Assets served from this origin that must stay reachable before sign-in.
  * Matched as whole file extensions rather than "contains a dot", which
@@ -8,19 +21,18 @@ import { buildCsp, staticSecurityHeaders } from '@/lib/security-headers';
  */
 const PUBLIC_ASSET = /\.(?:png|jpe?g|gif|webp|svg|ico|css|js|mjs|map|json|txt|xml|webmanifest|woff2?)$/i;
 
-const PUBLIC_PATHS = new Set(['/login']);
-
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Always allow the login page, backend-facing API routes, and static files.
   if (
-    PUBLIC_PATHS.has(pathname) ||
+    pathname === '/login' ||
     pathname.startsWith('/api') ||
     pathname.startsWith('/_next') ||
+    pathname === '/favicon.ico' ||
     PUBLIC_ASSET.test(pathname)
   ) {
-    return applySecurity();
+    return NextResponse.next();
   }
 
   const token = request.cookies.get('qhs_session')?.value;
@@ -30,25 +42,7 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  return applySecurity();
-}
-
-/**
- * Attaches the security headers to a response.
- *
- * The CSP is applied per request rather than once in next.config so it
- * reflects the environment's real API origins, but the directives are shared
- * from src/lib/security-headers so the two cannot drift.
- */
-function applySecurity() {
-  const csp = buildCsp();
-
-  const response = NextResponse.next();
-  response.headers.set('Content-Security-Policy', csp);
-  for (const header of staticSecurityHeaders) {
-    response.headers.set(header.key, header.value);
-  }
-  return response;
+  return NextResponse.next();
 }
 
 export const config = {
