@@ -47,6 +47,25 @@ class AuthTest extends TestCase
         $this->assertStringContainsString("frame-ancestors 'none'", $csp);
     }
 
+    /**
+     * The lockout counters live in the cache. On Render the filesystem is
+     * ephemeral, so a file cache would be wiped by every deploy and hand an
+     * attacker a fresh set of attempts while still looking like it worked.
+     */
+    public function test_the_default_cache_store_survives_a_restart(): void
+    {
+        $this->assertNotSame(
+            'file',
+            config('cache.default'),
+            'the default cache store must not be the file store',
+        );
+
+        $database = config('cache.stores.database');
+        $this->assertSame('database', $database['driver']);
+        $this->assertSame('cache', $database['table']);
+        $this->assertSame('cache_locks', $database['lock_table']);
+    }
+
     public function test_sign_in_stamps_last_login_at(): void
     {
         $admin = \App\Models\User::where('email', 'admin@quickwash.hub')->firstOrFail();

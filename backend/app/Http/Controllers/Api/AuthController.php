@@ -9,6 +9,7 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
@@ -22,12 +23,34 @@ class AuthController extends Controller
     /** Sliding window (minutes) over which attempts are counted. */
     protected const ATTEMPT_WINDOW_MINUTES = 15;
 
+    /**
+     * The lockout counters below live in the cache. On a platform with an
+     * ephemeral filesystem a file-backed cache is wiped by every deploy and
+     * every spin-down, which silently hands an attacker a fresh set of
+     * attempts and makes this control look like it is working when it is not.
+     * Say so loudly in the logs rather than fail the request.
+     */
+    private function warnIfLockoutWillNotSurviveARestart(): void
+    {
+        if (config('cache.default') !== 'file') {
+            return;
+        }
+
+        Log::warning(
+            'Login lockout is using the file cache on what looks like an ephemeral '
+            . 'filesystem. Failed-attempt counters will reset on every deploy or '
+            . 'instance restart. Set CACHE_DRIVER=database.'
+        );
+    }
+
     public function login(Request $request)
     {
         $request->validate([
             'email' => 'required|email',
             'password' => 'required',
         ]);
+
+        $this->warnIfLockoutWillNotSurviveARestart();
 
         // Brute-force lockout: keyed on (email + IP), independent of the
         // route-level throttle so a distributed attempt still trips a lock.
