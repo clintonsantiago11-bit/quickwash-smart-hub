@@ -55,37 +55,3 @@ export function terminalPhase(kind: OutcomeKind): 'success' | 'rejecting' | 'err
 export function totalRejectMs(): number {
   return COIN_REJECT_MS + COIN_EJECT_MS;
 }
-
-/* --- Preview timeline -------------------------------------------------
-   Lets an operator watch the reader without signing out. The durations are
-   taken from the constants above rather than eyeballed, so the preview is
-   the real sequence. This lives here, in a module that imports nothing, so
-   the Node test runner can load it without a bundler in the way. */
-
-/** How long the reader spends scanning, so the beam is actually visible. */
-export const PREVIEW_SCAN_MS = 1400;
-
-export type PreviewPhase = 'inserting' | 'authenticating' | 'rejecting';
-
-export interface PreviewStep {
-  phase: PreviewPhase;
-  /** How long this step is held before the next one starts. */
-  afterMs: number;
-}
-
-/**
- * The sequence a rejected credential produces: fed in, read, then caught and
- * returned. Success is deliberately left out — replaying it would flash a
- * success panel at someone who is already signed in.
- */
-export function previewTimeline(): PreviewStep[] {
-  return [
-    { phase: 'inserting', afterMs: COIN_INSERT_MS },
-    { phase: 'authenticating', afterMs: PREVIEW_SCAN_MS },
-    { phase: 'rejecting', afterMs: totalRejectMs() },
-  ];
-}
-
-export function previewTotalMs(): number {
-  return previewTimeline().reduce((total, step) => total + step.afterMs, 0);
-}

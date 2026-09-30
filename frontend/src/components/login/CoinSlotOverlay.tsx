@@ -1,7 +1,7 @@
 import { useEffect, useRef, type KeyboardEvent } from 'react';
 import type { LoginPhase } from '@/lib/auth';
 
-export type MachinePhase = Extract<LoginPhase, 'inserting' | 'authenticating' | 'rejecting' | 'success'>;
+type MachinePhase = Extract<LoginPhase, 'inserting' | 'authenticating' | 'rejecting' | 'success'>;
 
 interface CoinSlotOverlayProps {
   phase: MachinePhase;

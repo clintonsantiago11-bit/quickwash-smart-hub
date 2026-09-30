@@ -8,7 +8,6 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '@/lib/api';
 import { PageSkeleton } from '@/components/ui/Skeleton';
-import CoinSlotPreview, { ReplayCoinReader } from '@/components/login/CoinSlotPreview';
 import { useUI } from '@/providers/UIProvider';
 import {
   activityLabel, fieldErrorsFrom, initials, isDirty, isPasswordComplete,
@@ -92,7 +91,6 @@ export default function ProfilePage() {
   const [changingPassword, setChangingPassword] = useState(false);
 
   const [uploading, setUploading] = useState(false);
-  const [previewing, setPreviewing] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const confirmRef = useRef<HTMLInputElement>(null);
 
@@ -350,10 +348,6 @@ export default function ProfilePage() {
                   <dd className="text-xs font-medium">{memberSince(profile.created_at)}</dd>
                 </div>
               </dl>
-
-              <div className="mt-5 w-full">
-                <ReplayCoinReader onPlay={() => setPreviewing(true)} />
-              </div>
             </section>
           </div>
 
@@ -636,8 +630,6 @@ export default function ProfilePage() {
           </div>
         </div>
       </main>
-
-      {previewing && <CoinSlotPreview onDismiss={() => setPreviewing(false)} />}
     </>
   );
 }
