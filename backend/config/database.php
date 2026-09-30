@@ -1,5 +1,33 @@
 <?php
 
+/*
+|--------------------------------------------------------------------------
+| TLS
+|--------------------------------------------------------------------------
+|
+| TiDB Serverless refuses any connection that is not encrypted, so the SSL
+| options have to reach PDO with their real integer keys. PDO option
+| constants are integers, and array_merge() renumbers integer keys — using it
+| here silently turned ATTR_PERSISTENT into key 0 and the CA path into key 1,
+| which meant no TLS at all and a boot failure on every deploy. The arrays
+| below are combined with +, which preserves keys.
+|
+*/
+
+$caPath = env('DB_SSL_CA', env('MYSQL_ATTR_SSL_CA', '/etc/ssl/certs/ca-certificates.crt'));
+$sslEnabled = (bool) (env('DB_SSL_CA') || env('MYSQL_ATTR_SSL_CA') || file_exists($caPath));
+
+$mysqlOptions = extension_loaded('pdo_mysql') ? array_filter([
+    // Off by default. It cuts the per-request TLS handshake, which is worth
+    // having on a 0.1 CPU instance, but it is opt-in so a problem with it
+    // cannot reach production on its own. Turn it on with DB_PERSISTENT=true
+    // once the connection has proved stable.
+    PDO::ATTR_PERSISTENT => env('DB_PERSISTENT', false),
+
+    PDO::MYSQL_ATTR_SSL_CA => $sslEnabled ? $caPath : null,
+    PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT => $sslEnabled ? false : null,
+], fn ($value) => $value !== null) : [];
+
 return [
     'default' => env('DB_CONNECTION', 'mysql'),
     'connections' => [
@@ -18,19 +46,7 @@ return [
             'prefix_indexes' => true,
             'strict' => true,
             'engine' => null,
-            'options' => extension_loaded('pdo_mysql') ? (array_merge(
-                [
-                    // The API runs on a single small instance, so a fresh TCP
-                    // and TLS handshake to TiDB on every request is a
-                    // meaningful share of a very small CPU budget. Keeping the
-                    // connection alive across requests removes that cost.
-                    PDO::ATTR_PERSISTENT => env('DB_PERSISTENT', true),
-                ],
-                (env('DB_SSL_CA') || env('MYSQL_ATTR_SSL_CA') || file_exists('/etc/ssl/certs/ca-certificates.crt') ? [
-                    PDO::MYSQL_ATTR_SSL_CA => env('DB_SSL_CA', env('MYSQL_ATTR_SSL_CA', '/etc/ssl/certs/ca-certificates.crt')),
-                    PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT => false,
-                ] : [])
-            )) : [],
+            'options' => $mysqlOptions,
         ],
     ],
     'migrations' => [
