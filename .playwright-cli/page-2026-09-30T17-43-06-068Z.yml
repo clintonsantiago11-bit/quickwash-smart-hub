@@ -1,0 +1,18 @@
+- generic [active] [ref=e1]:
+  - main [ref=e2]:
+    - region [ref=e3]:
+      - heading "This page is unavailable" [level=1] [ref=e4]
+      - paragraph [ref=e5]: Routing Middleware for this page temporarily failed.
+      - button "Reload page" [ref=e6] [cursor=pointer]
+      - generic "HTTP status, error code, and request ID" [ref=e7]:
+        - paragraph [ref=e8]: 500 MIDDLEWARE_INVOCATION_FAILED
+        - paragraph [ref=e9]: sin1::qvggn-1790790183133-b5fee3941c9e
+  - generic "Documentation, logs, and debugging actions" [ref=e10]:
+    - link "View MIDDLEWARE_INVOCATION_FAILED documentation" [ref=e11] [cursor=pointer]:
+      - /url: https://vercel.com/docs/errors/middleware_invocation_failed
+      - generic [ref=e12]: View Documentation
+    - link "View Logs" [ref=e15] [cursor=pointer]:
+      - /url: /_logs?requestId=sin1::qvggn-1790790183133-b5fee3941c9e
+    - button "Copy MIDDLEWARE_INVOCATION_FAILED debugging instructions to clipboard" [ref=e19] [cursor=pointer]:
+      - generic [ref=e20]: Copy Debug Prompt
+    - status [ref=e21]
