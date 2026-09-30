@@ -3,6 +3,7 @@ import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { UIProvider } from "@/providers/UIProvider";
 import LayoutContent from "@/components/LayoutContent";
+import IdleLogout from "@/components/IdleLogout";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -37,6 +38,9 @@ export default function RootLayout({
       <body className="antialiased" suppressHydrationWarning>
         <UIProvider>
           <LayoutContent>{children}</LayoutContent>
+          {/* Signs an unattended terminal out, so the next person at the
+              machine does not inherit the last operator's session. */}
+          <IdleLogout />
         </UIProvider>
       </body>
     </html>
