@@ -18,12 +18,19 @@ return [
             'prefix_indexes' => true,
             'strict' => true,
             'engine' => null,
-            'options' => extension_loaded('pdo_mysql') ? (
-                env('DB_SSL_CA') || env('MYSQL_ATTR_SSL_CA') || file_exists('/etc/ssl/certs/ca-certificates.crt') ? [
+            'options' => extension_loaded('pdo_mysql') ? (array_merge(
+                [
+                    // The API runs on a single small instance, so a fresh TCP
+                    // and TLS handshake to TiDB on every request is a
+                    // meaningful share of a very small CPU budget. Keeping the
+                    // connection alive across requests removes that cost.
+                    PDO::ATTR_PERSISTENT => env('DB_PERSISTENT', true),
+                ],
+                (env('DB_SSL_CA') || env('MYSQL_ATTR_SSL_CA') || file_exists('/etc/ssl/certs/ca-certificates.crt') ? [
                     PDO::MYSQL_ATTR_SSL_CA => env('DB_SSL_CA', env('MYSQL_ATTR_SSL_CA', '/etc/ssl/certs/ca-certificates.crt')),
                     PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT => false,
-                ] : []
-            ) : [],
+                ] : [])
+            )) : [],
         ],
     ],
     'migrations' => [

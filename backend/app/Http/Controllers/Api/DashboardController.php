@@ -8,20 +8,45 @@ use App\Models\Alert;
 use App\Models\VendingTransaction;
 use App\Models\SensorLog;
 use App\Models\WashLog;
-use Illuminate\Http\Request;
-use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
 
 class DashboardController extends Controller
 {
+    /**
+     * Seconds the dashboard summary is shared between callers.
+     *
+     * Every signed-in browser polls this every ten seconds, so a dozen
+     * terminals means a dozen copies of the same nine queries. Caching for a
+     * few seconds collapses that to one computation regardless of how many
+     * people are watching, which is what makes a small instance viable. The
+     * figures are revenue totals, wash counts and device heartbeats — none of
+     * which change meaningfully in five seconds.
+     */
+    private const CACHE_SECONDS = 5;
+
     public function stats()
     {
-        $todayRevenue = (float) VendingTransaction::whereDate('transaction_time', today())->sum('amount');
-        $yesterdayRevenue = (float) VendingTransaction::whereDate('transaction_time', Carbon::yesterday())->sum('amount');
+        return response()->json(
+            Cache::remember('dashboard.stats', self::CACHE_SECONDS, fn () => $this->buildStats())
+        );
+    }
+
+    private function buildStats(): array
+    {
+        // A range on the raw column, not whereDate(). Wrapping the column in
+        // DATE() means no index can ever be used, which turns these into full
+        // scans of two of the busiest tables. See the query-index migration.
+        $startOfToday = now()->startOfDay();
+        $endOfToday = $startOfToday->copy()->addDay();
+        $startOfYesterday = $startOfToday->copy()->subDay();
+
+        $todayRevenue = (float) VendingTransaction::whereBetween('transaction_time', [$startOfToday, $endOfToday])->sum('amount');
+        $yesterdayRevenue = (float) VendingTransaction::whereBetween('transaction_time', [$startOfYesterday, $startOfToday])->sum('amount');
         $revenueChange = $yesterdayRevenue > 0
             ? round((($todayRevenue - $yesterdayRevenue) / $yesterdayRevenue) * 100)
             : null;
 
-        $activeWashes = WashLog::whereDate('completed_at', today())->count();
+        $activeWashes = WashLog::whereBetween('completed_at', [$startOfToday, $endOfToday])->count();
 
         $totalBays = max(1, Device::where('type', 'controller')->count());
 
@@ -34,14 +59,14 @@ class DashboardController extends Controller
 
         $latestLevels = SensorLog::where('device_id', 'esp32_bay_1')
             ->whereNotNull('water_level')
-            ->latest('recorded_at')
+            ->orderByDesc('recorded_at')
             ->first();
         $latestFlowTemp = SensorLog::where('device_id', 'esp32_bay_1')
             ->whereNotNull('flow_rate')
-            ->latest('recorded_at')
+            ->orderByDesc('recorded_at')
             ->first();
 
-        return response()->json([
+        return [
             'stats' => [
                 ['label' => "Today's Revenue", 'value' => "₱" . number_format($todayRevenue, 2), 'change' => $revenueChange === null ? null : (($revenueChange >= 0 ? '+' : '') . $revenueChange . '% vs yesterday')],
                 ['label' => 'Active Washes', 'value' => (string) $activeWashes, 'subValue' => "/ {$totalBays} bays"],
@@ -55,6 +80,6 @@ class DashboardController extends Controller
             ],
             'flow_rate' => $latestFlowTemp?->flow_rate,
             'temperature' => $latestFlowTemp?->temperature,
-        ]);
+        ];
     }
 }

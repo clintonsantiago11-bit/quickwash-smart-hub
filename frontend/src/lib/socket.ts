@@ -1,7 +1,16 @@
 import { io, Socket } from 'socket.io-client';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
-const WS_URL = process.env.NEXT_PUBLIC_WS_URL || 'http://localhost:3001';
+
+/**
+ * The live bridge is optional. In a cloud deployment it is usually not
+ * configured, and falling back to a localhost default made every browser
+ * dial its own machine on port 3001 and retry forever — visible as
+ * ERR_CONNECTION_REFUSED in the console on every page load, plus a stream of
+ * pointless reconnection attempts. Null means "no live feed"; connect() is a
+ * no-op and the dashboard falls back to polling.
+ */
+const WS_URL = process.env.NEXT_PUBLIC_WS_URL || null;
 
 interface HardwareUpdatePayload {
   topic: string;
@@ -61,6 +70,10 @@ class SocketService {
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
   async connect() {
+    // No bridge configured: nothing to connect to, and no reconnection
+    // attempts to burn cycles on.
+    if (!WS_URL) return;
+
     if (this.socket) {
       if (!this.socket.connected) this.socket.connect();
       return;

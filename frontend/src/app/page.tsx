@@ -115,8 +115,44 @@ export default function DashboardPage() {
     };
     fetchDashboard();
     fetchDevices();
-    const interval = setInterval(() => { fetchDashboard(); fetchDevices(); }, 10000);
-    return () => clearInterval(interval);
+
+    // Poll only while the tab is actually being looked at, and jitter the
+    // first interval so a room full of terminals does not hit the API in
+    // lockstep. A hidden tab has nobody reading it, and every poll is a
+    // request the small API instance has to answer for nothing.
+    const POLL_MS = 10000;
+    const JITTER_MS = 4000;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
+    const schedule = () => {
+      if (timer) clearTimeout(timer);
+      const hidden = typeof document !== 'undefined' && document.hidden;
+      const delay = hidden ? POLL_MS : POLL_MS + Math.random() * JITTER_MS;
+      timer = setTimeout(async () => {
+        if (!document.hidden) {
+          fetchDashboard();
+          fetchDevices();
+        }
+        schedule();
+      }, delay);
+    };
+
+    const onVisibility = () => {
+      // Come back to a fresh reading rather than waiting out the timer.
+      if (!document.hidden) {
+        fetchDashboard();
+        fetchDevices();
+      }
+      schedule();
+    };
+
+    schedule();
+    document.addEventListener('visibilitychange', onVisibility);
+
+    return () => {
+      if (timer) clearTimeout(timer);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
   }, []);
 
   // Live bay telemetry over Socket.IO (every 3s from the bridge)

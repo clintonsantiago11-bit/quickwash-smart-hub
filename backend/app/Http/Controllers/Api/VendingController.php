@@ -31,9 +31,13 @@ class VendingController extends Controller
 
     public function stats()
     {
-        $today = VendingTransaction::whereDate('transaction_time', today());
-        $totalToday = (float) $today->sum('amount');
-        $countToday = $today->count();
+        // A range on the raw column so the index applies; whereDate() would
+        // wrap it in DATE() and force a scan of the whole transactions table.
+        $start = now()->startOfDay();
+        $end = $start->copy()->addDay();
+
+        $totalToday = (float) VendingTransaction::whereBetween('transaction_time', [$start, $end])->sum('amount');
+        $countToday = VendingTransaction::whereBetween('transaction_time', [$start, $end])->count();
 
         $allTime = (float) VendingTransaction::sum('amount');
 

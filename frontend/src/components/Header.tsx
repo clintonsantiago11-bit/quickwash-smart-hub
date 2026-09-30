@@ -60,17 +60,42 @@ export default function Header({ title, subtitle }: HeaderProps) {
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchNotifications();
-    const interval = setInterval(fetchNotifications, 15000);
+
+    // The alert list is fetched on every page, so this is the most-requested
+    // endpoint in the app. Skip it while the tab is hidden — nobody is
+    // looking at a notification badge they cannot see — and jitter the first
+    // interval so several terminals do not all poll at the same moment.
+    const POLL_MS = 15000;
+    const JITTER_MS = 3000;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
+    const schedule = () => {
+      if (timer) clearTimeout(timer);
+      const delay = document.hidden ? POLL_MS : POLL_MS + Math.random() * JITTER_MS;
+      timer = setTimeout(async () => {
+        if (!document.hidden) await fetchNotifications();
+        schedule();
+      }, delay);
+    };
+
+    const onVisibility = () => {
+      if (!document.hidden) void fetchNotifications();
+      schedule();
+    };
+
+    schedule();
+    document.addEventListener('visibilitychange', onVisibility);
 
     // Refresh instantly when the bridge reports a new alert topic
     const unsub = socketService.onHardwareUpdate((msg) => {
       if (msg?.topic && msg.topic.includes('/alert/')) {
-        fetchNotifications();
+        void fetchNotifications();
       }
     });
 
     return () => {
-      clearInterval(interval);
+      if (timer) clearTimeout(timer);
+      document.removeEventListener('visibilitychange', onVisibility);
       unsub();
     };
   }, []);

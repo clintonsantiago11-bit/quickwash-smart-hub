@@ -50,17 +50,29 @@ class AnalyticsController extends Controller
         return $this->revenue($request);
     }
 
+    /**
+     * Washes by hour for today.
+     *
+     * This used to issue thirteen separate COUNT queries, one per hour, each
+     * filtering with HOUR(completed_at) — a function on the column, so no
+     * index could apply and every one was a full scan of the table. One
+     * grouped query over a sargable range gives the same thirteen numbers.
+     */
     public function peakHours()
     {
+        $start = Carbon::now()->startOfDay();
+        $end = $start->copy()->addDay();
+
+        $byHour = WashLog::whereBetween('completed_at', [$start, $end])
+            ->selectRaw('HOUR(completed_at) as hour, COUNT(*) as volume')
+            ->groupBy('hour')
+            ->pluck('volume', 'hour');
+
         $hours = [];
         for ($h = 8; $h <= 20; $h++) {
-            $count = WashLog::whereRaw('HOUR(completed_at) = ?', [$h])
-                ->whereDate('completed_at', today())
-                ->count();
-
             $hours[] = [
-                'hour' => str_pad($h, 2, '0') . ':00',
-                'volume' => $count,
+                'hour' => str_pad((string) $h, 2, '0', STR_PAD_LEFT) . ':00',
+                'volume' => (int) ($byHour[$h] ?? 0),
             ];
         }
 
