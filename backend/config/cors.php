@@ -61,9 +61,14 @@ return [
     'exposed_headers' => [],
     'max_age' => 86400,
 
-    // The dashboard authenticates with a bearer token, never a cookie, so
-    // there is nothing for the browser to attach and nothing for a foreign
-    // origin to steal. Turning this off is what makes the preview pattern
-    // above safe.
-    'supports_credentials' => false,
+    // The dashboard fetches with credentials: 'include', and the browser
+    // refuses the whole response unless this header is present. Turning it off
+    // looks stricter but is what broke sign-in: the fetch rejected and the UI
+    // reported "QuickWash could not be reached".
+    //
+    // Credentials here do not mean the auth cookie can be ridden cross-origin.
+    // auth_token is SameSite=Lax, so a cross-site XHR never carries it, and
+    // Sanctum authenticates on the Authorization header anyway. A preview
+    // deployment therefore gets a response with no session attached to it.
+    'supports_credentials' => true,
 ];

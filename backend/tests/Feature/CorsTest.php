@@ -72,17 +72,32 @@ class CorsTest extends TestCase
      * dashboard authenticates with a bearer token, so there is no cookie for a
      * foreign origin to ride on.
      */
-    public function test_credentials_are_never_allowed_cross_origin(): void
+    /**
+     * The client fetches with credentials: 'include', and the browser
+     * discards the entire response if this header is missing � which is what
+     * made sign-in fail while the API itself kept returning 200 to anything
+     * not enforcing CORS.
+     */
+    public function test_credentials_are_advertised_or_the_browser_drops_the_response(): void
     {
-        $this->assertFalse(
+        $this->assertTrue(
             config('cors.supports_credentials'),
-            'turning credentials back on would make the preview pattern exploitable',
+            'credentials must be advertised or the browser blocks every API response',
         );
 
-        $response = $this->preflight('https://quickwash-smart-0kww6f5vh-i-think1.vercel.app');
-        $this->assertNull($response->headers->get('Access-Control-Allow-Credentials'));
+        // Every origin that is allowed has to carry both headers. Laravel's
+        // test client does not enforce CORS the way a browser does, so nothing
+        // else in this suite would catch one being missing.
+        foreach ([
+            'https://quickwash-smart-hub.vercel.app',
+            'https://quickwash-smart-0kww6f5vh-i-think1.vercel.app',
+            'http://localhost:3000',
+        ] as $origin) {
+            $response = $this->preflight($origin);
+            $this->assertSame($origin, $response->headers->get('Access-Control-Allow-Origin'), $origin);
+            $this->assertSame('true', $response->headers->get('Access-Control-Allow-Credentials'), $origin);
+        }
     }
-
     public function test_bearer_auth_still_crosses_origin(): void
     {
         $response = $this->preflight('https://quickwash-smart-hub.vercel.app');

@@ -45,6 +45,14 @@ class AllowVercelPreviewOrigins
         // origin, HandleCors has answered and this stays out of the way.
         if (! $response->headers->has('Access-Control-Allow-Origin')) {
             $response->headers->set('Access-Control-Allow-Origin', $origin);
+
+            // Required as well. The dashboard fetches with
+            // credentials: 'include' and the browser discards the entire
+            // response without this header, so omitting it looks like it works
+            // right up until sign-in fails. config/cors.php sets
+            // supports_credentials for the same reason.
+            $response->headers->set('Access-Control-Allow-Credentials', 'true');
+
             $response->headers->set('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
             $response->headers->set(
                 'Access-Control-Allow-Headers',
