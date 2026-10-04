@@ -1,5 +1,7 @@
 <?php
 
+use App\Support\AuditRetention;
+use Illuminate\Support\Facades\Schedule;
 use Illuminate\Support\Facades\Artisan;
 
 /*
@@ -23,3 +25,17 @@ Artisan::command('iot:bridge-status', function () {
     $this->info('MQTT ingestion is handled by the Node.js IoT Bridge (iot-bridge/index.js).');
     $this->info('Run: node iot-bridge/index.js');
 })->describe('Show how to start the IoT Bridge');
+
+/*
+|--------------------------------------------------------------------------
+| Audit retention
+|--------------------------------------------------------------------------
+|
+| Keeps the trail bounded so it cannot grow without limit. The command warns
+| for a week before it deletes anything, and the dashboard shows the same
+| warning through GET /api/audit/retention so nobody discovers the cutoff
+| from a missing row.
+|
+*/
+
+Schedule::command('audit:prune')->dailyAt('02:40');

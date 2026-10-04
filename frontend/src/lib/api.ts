@@ -249,6 +249,15 @@ class ApiClient {
     const qs = params ? `?${new URLSearchParams(params).toString()}` : '';
     return this.get(`/audit-logs${qs}`);
   }
+
+  /**
+   * What the retention job will delete, so the dashboard can warn before
+   * anything is lost rather than after.
+   */
+  getAuditRetention(days?: number) {
+    const qs = days ? `?days=${days}` : '';
+    return this.get(`/audit-logs/retention${qs}`);
+  }
 }
 
 export const api = new ApiClient();

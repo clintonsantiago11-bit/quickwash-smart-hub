@@ -147,8 +147,10 @@ async function logVendingTransaction(deviceId, amount) {
       'INSERT INTO vending_transactions (device_id, amount, payment_method, transaction_time) VALUES (?, ?, ?, NOW())',
       [deviceId, amount, 'coin']
     );
-    const name = await getDeviceName(deviceId);
-    await createAuditLog('System', 'COIN_ACCEPTED', `A ₱${amount} coin was accepted by the ${name}`);
+    // No COIN_ACCEPTED audit row. The transaction above is already the
+    // record of this coin, and the Vending page reads it from there. The
+    // audit trail is for events with nowhere else to live, so a duplicated
+    // copy just doubled the rows written for every coin.
     return result;
   } catch (error) {
     console.error('[DB Error] Failed to log vending transaction:', error.message);
@@ -230,9 +232,8 @@ async function logWashCompletion(deviceId, cycleType, startedAt, completedAt) {
        VALUES (?, ?, ?, ?, ?, ?)`,
       [deviceId, cycleType || 'standard', price, startedAt ? new Date(startedAt) : null, new Date(completedAt), duration]
     );
-    const name = await getDeviceName(deviceId);
-    const cycleLabel = CYCLE_LABELS[cycleType] || cycleType;
-    await createAuditLog('System', 'WASH_COMPLETED', `A ${cycleLabel} wash cycle finished on the ${name} — ₱${price}, took ${humanDuration(duration)}`);
+    // No WASH_COMPLETED audit row. The wash_logs row above is the record, and
+    // Analytics reads it from there.
     return result.insertId;
   } catch (error) {
     console.error('[DB Error] Failed to log wash completion:', error.message);
@@ -275,7 +276,7 @@ async function updateUserProfile(userId, data) {
 async function createAuditLog(user, action, details, ip = null) {
   try {
     const [result] = await pool.execute(
-      'INSERT INTO audit_logs (user, action, details, ip_address, created_at, updated_at) VALUES (?, ?, ?, ?, NOW(), NOW())',
+      'INSERT INTO audit_logs (user, action, details, ip_address, created_at) VALUES (?, ?, ?, ?, NOW())',
       [user, action, details, ip]
     );
     return result;

@@ -13,6 +13,7 @@ import {
   Droplets,
   AlertTriangle,
   CheckCircle2,
+  KeyRound,
   Search,
   RefreshCw,
   ChevronDown,
@@ -23,6 +24,13 @@ import {
 import { useState, useEffect } from 'react';
 import { api } from '@/lib/api';
 import { exportRows, type ExportFormat } from '@/lib/export';
+import {
+  retentionMessage,
+  retentionTitle,
+  retentionUrgency,
+  shouldWarnAboutRetention,
+  type RetentionPreview,
+} from '@/lib/retention';
 
 interface AuditItem {
   id: number;
@@ -33,20 +41,25 @@ interface AuditItem {
   time: string;
 }
 
+// Only events with no other home reach the audit trail. Coins and wash cycles
+// are deliberately absent: a sale is already a VendingTransaction and a
+// WashLog, and the Vending and Analytics pages read it from there. Writing it
+// a third time here tripled the rows written for every coin.
 const ACTION_FILTERS = [
   { value: 'ALL', label: 'All events' },
   { value: 'LOGIN', label: 'Sign in' },
   { value: 'LOGOUT', label: 'Sign out' },
   { value: 'FAILED_LOGIN', label: 'Failed sign-in' },
+  { value: 'CHANGE_PASSWORD', label: 'Password changed' },
   { value: 'DEVICE_COMMAND', label: 'Machine commands' },
   { value: 'DEVICE_ONLINE', label: 'Device came online' },
   { value: 'DEVICE_OFFLINE', label: 'Device went offline' },
-  { value: 'COIN_ACCEPTED', label: 'Coins accepted' },
-  { value: 'WASH_COMPLETED', label: 'Wash cycles finished' },
   { value: 'ALERT_TRIGGERED', label: 'Alerts triggered' },
   { value: 'ALERT_RESOLVED', label: 'Alerts cleared' },
   { value: 'RESOLVE_ALERT', label: 'Alerts marked resolved' },
   { value: 'VENDO_CONFIG', label: 'Vending machine settings' },
+  { value: 'NAEK_SALES_RESET', label: 'Sales counters reset' },
+  { value: 'NAEK_SYNC_ERROR', label: 'Timer sync failures' },
   { value: 'UPDATE_PROFILE', label: 'Profile updates' },
   { value: 'UPDATE_PREFERENCES', label: 'Preference changes' },
 ] as const;
@@ -57,15 +70,16 @@ const ACTION_META: Record<string, { icon: React.ReactNode; color: string; type: 
   LOGIN: { icon: <LogIn size={13} />, color: '#34D399', type: 'user' },
   LOGOUT: { icon: <LogOut size={13} />, color: '#94A3B8', type: 'user' },
   FAILED_LOGIN: { icon: <ShieldAlert size={13} />, color: '#F87171', type: 'security' },
+  CHANGE_PASSWORD: { icon: <KeyRound size={13} />, color: '#F87171', type: 'security' },
   DEVICE_COMMAND: { icon: <TerminalSquare size={13} />, color: '#38BDF8', type: 'command' },
   DEVICE_ONLINE: { icon: <Droplets size={13} />, color: '#2DD4BF', type: 'device' },
   DEVICE_OFFLINE: { icon: <Droplets size={13} />, color: '#64748B', type: 'device' },
-  COIN_ACCEPTED: { icon: <Coins size={13} />, color: '#FBBF24', type: 'vending' },
-  WASH_COMPLETED: { icon: <Droplets size={13} />, color: '#22D3EE', type: 'vending' },
   ALERT_TRIGGERED: { icon: <AlertTriangle size={13} />, color: '#F87171', type: 'system' },
   ALERT_RESOLVED: { icon: <CheckCircle2 size={13} />, color: '#34D399', type: 'system' },
   RESOLVE_ALERT: { icon: <CheckCircle2 size={13} />, color: '#34D399', type: 'system' },
   VENDO_CONFIG: { icon: <Settings size={13} />, color: '#C084FC', type: 'settings' },
+  NAEK_SALES_RESET: { icon: <Coins size={13} />, color: '#FBBF24', type: 'vending' },
+  NAEK_SYNC_ERROR: { icon: <AlertTriangle size={13} />, color: '#FBBF24', type: 'vending' },
   UPDATE_PROFILE: { icon: <User size={13} />, color: '#60A5FA', type: 'user' },
   UPDATE_PREFERENCES: { icon: <Settings size={13} />, color: '#60A5FA', type: 'settings' },
 };
@@ -87,6 +101,7 @@ export default function AuditLogPage() {
   const [total, setTotal] = useState(0);
   const [format, setFormat] = useState<ExportFormat>('excel');
   const [exporting, setExporting] = useState(false);
+  const [retention, setRetention] = useState<RetentionPreview | null>(null);
 
   const fetchLogs = async (action = filter, query = search, pageNum = page) => {
     setRefreshing(true);
@@ -117,6 +132,26 @@ export default function AuditLogPage() {
       window.removeEventListener('focus', onFocus);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Warn about retention separately from the log itself, and only once. The
+  // answer changes daily when the cleanup runs, so there is no reason to
+  // re-ask it on the same three second poll as the log.
+  useEffect(() => {
+    let cancelled = false;
+
+    api.getAuditRetention()
+      .then((data) => {
+        if (!cancelled) setRetention(data as RetentionPreview);
+      })
+      .catch(() => {
+        // A missing preview must never block the log itself.
+        if (!cancelled) setRetention(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const handleFilterChange = (value: ActionType) => {
@@ -166,6 +201,37 @@ export default function AuditLogPage() {
     <>
       <Header title="Audit Log" subtitle="Complete, real-time record of system events and administrative actions" />
       <main className="flex-1 p-3 sm:p-4 md:p-6 space-y-6 w-full max-w-[1600px] mx-auto overflow-x-hidden">
+        {/* Retention warning. Shown before anything is deleted, not after,
+            because the deletion cannot be undone. */}
+        {shouldWarnAboutRetention(retention) && retention && (
+          <div
+            role="status"
+            aria-live="polite"
+            className="flex items-start gap-3 rounded-xl border px-4 py-3"
+            style={
+              retentionUrgency(retention) === 'urgent'
+                ? { borderColor: 'rgba(248,113,113,0.45)', background: 'rgba(127,29,29,0.2)' }
+                : { borderColor: 'rgba(251,191,36,0.4)', background: 'rgba(120,53,15,0.16)' }
+            }
+          >
+            <AlertTriangle
+              size={16}
+              className="mt-0.5 shrink-0"
+              style={{ color: retentionUrgency(retention) === 'urgent' ? '#FCA5A5' : '#FCD34D' }}
+              aria-hidden="true"
+            />
+            <div className="min-w-0">
+              <p
+                className="text-xs font-bold uppercase tracking-widest"
+                style={{ color: retentionUrgency(retention) === 'urgent' ? '#FCA5A5' : '#FCD34D' }}
+              >
+                {retentionTitle(retention)}
+              </p>
+              <p className="mt-1 text-sm text-[var(--text-muted)]">{retentionMessage(retention)}</p>
+            </div>
+          </div>
+        )}
+
         {/* Filter bar */}
         <div className="card p-4 sm:p-5 space-y-4">
           <div className="flex flex-col lg:flex-row lg:items-center gap-3">

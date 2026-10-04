@@ -101,8 +101,9 @@ async function persistEventDb(ev) {
       const startedAt = new Date(now.getTime() - ev.durationSeconds * ev.count * 1000);
       await db.pool.execute(`INSERT INTO vending_transactions (device_id, amount, payment_method, transaction_time) VALUES (?, ?, 'coin', NOW())`, [NAEK_DEVICE_ID, ev.amount]);
       await db.pool.execute(`INSERT INTO wash_logs (device_id, cycle_type, price, started_at, completed_at, duration_seconds) VALUES (?, ?, ?, ?, ?, ?)`, [NAEK_DEVICE_ID, ev.product.toLowerCase(), ev.amount, startedAt, now, ev.durationSeconds * ev.count]);
-      const label = ev.count > 1 ? `${ev.count}x ${ev.product}` : ev.product;
-      await db.createAuditLog('System', 'NAEK_SALE', `${label} cycle sold on the ${NAEK_DEVICE_NAME} — ₱${ev.amount}`);
+      // No NAEK_SALE audit row: the transaction and wash log above already
+      // record this sale. sales_reset is kept because resetting a counter has
+      // no other record and it matters for revenue integrity.
     } else if (ev.type === 'sales_reset' || ev.type === 'total_reset') {
       await db.createAuditLog('System', 'NAEK_SALES_RESET', `Sales counters were reset on the ${NAEK_DEVICE_NAME}`);
     }

@@ -52,6 +52,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/analytics/peak-hours', [AnalyticsController::class, 'peakHours']);
 
     Route::get('/audit-logs', [AuditController::class, 'index'])->middleware('role:admin');
+    Route::get('/audit-logs/retention', [AuditController::class, 'retention'])->middleware('role:admin');
 
     Route::get('/dashboard/stats', [App\Http\Controllers\Api\DashboardController::class, 'stats']);
 });

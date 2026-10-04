@@ -37,3 +37,11 @@ backups/
 .vscode/
 .DS_Store
 Thumbs.db
+
+# --- local tooling scratch ---
+.playwright-cli/
+*.tsbuildinfo
+devserver.log
+prod.log
+api.log
+api_err.log

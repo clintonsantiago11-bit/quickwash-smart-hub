@@ -102,14 +102,12 @@ class NaekIngestController extends Controller
                     'duration_seconds' => $duration,
                 ]);
 
-                $label = ($event['count'] ?? 1) > 1
-                    ? (($event['count'] ?? 1) . 'x ' . $event['product'])
-                    : $event['product'];
-                AuditLog::create([
-                    'user' => 'System',
-                    'action' => 'NAEK_SALE',
-                    'details' => "{$label} cycle sold on the {$deviceName} — ₱{$event['amount']}",
-                ]);
+// No audit row here on purpose. This sale is already recorded
+                // as a VendingTransaction and a WashLog, which is where the
+                // Vending and Analytics pages read it from. Writing it a third
+                // time into the audit trail tripled the row count for every
+                // coin without adding any information, and the audit trail is
+                // meant to hold only events with no other home.
                 $ingested++;
             } elseif (in_array($event['type'] ?? '', ['sales_reset', 'total_reset'], true)) {
                 AuditLog::create([

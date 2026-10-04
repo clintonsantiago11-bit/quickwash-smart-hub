@@ -4,10 +4,28 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
+use App\Support\AuditRetention;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 
 class AuditController extends Controller
 {
+    /**
+     * What the retention job is about to do.
+     *
+     * Deleting audit rows cannot be undone, so the dashboard asks here rather
+     * than discovering it afterwards. Cached briefly because it runs two
+     * counts and the answer only changes once a day, when the prune runs.
+     */
+    public function retention(Request $request)
+    {
+        $days = max(1, min(3650, $request->integer('days', AuditRetention::DEFAULT_DAYS)));
+
+        return response()->json(
+            Cache::remember("audit.retention.{$days}", 300, fn () => AuditRetention::preview($days))
+        );
+    }
+
     public function index(Request $request)
     {
         $query = AuditLog::orderBy('created_at', 'desc');
@@ -30,7 +48,18 @@ class AuditController extends Controller
 
         $perPage = min(50, max(1, $request->integer('limit', 10)));
         $page = max(1, $request->integer('page', 1));
-        $total = (clone $query)->count();
+
+        // The page count used to be COUNT(*) over the whole table on every
+        // single request, including paging, which is the one thing a growing
+        // trail makes expensive. Cached per filter/search for a minute: the
+        // number is only used to draw the pager, so a minute of staleness is
+        // invisible, and a page turn no longer re-counts.
+        $cacheKey = 'audit.total.' . sha1(json_encode([
+            $request->input('action'),
+            $request->input('search'),
+            $perPage,
+        ]));
+        $total = Cache::remember($cacheKey, 60, fn () => (clone $query)->count());
 
         $logs = $query->skip(($page - 1) * $perPage)
             ->take($perPage)
