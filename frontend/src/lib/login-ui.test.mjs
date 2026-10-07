@@ -92,19 +92,47 @@ test('the greeting is decided by whether this browser has signed in before', () 
   assert.match(page, /remembered_email/);
 });
 
-test('the waiting state is honest about a wait it cannot measure', () => {
+test('the waiting state is a label, not an animation', () => {
   const page = source('../app/login/page.tsx');
   const form = source('../components/login/CredentialForm.tsx');
 
   assert.match(page, /setPhase\('verifying'\)/);
-  assert.match(form, /Verifying/);
-  assert.match(form, /login-progress/);
+  assert.match(form, /'Verifying…'/);
 
-  // No percentage: password hashing takes seconds on a small instance and
-  // there is no way to know how far through it the server is.
-  assert.doesNotMatch(form, /%\s*}/, 'an invented percentage would be a lie about a security step');
-  assert.match(form, /login-progress-bar/);
+  // The progress bar was removed rather than frozen. It could only ever
+  // sweep, because nothing knows how far through the server's password
+  // hashing the request is, and a bar that cannot fill reads as stalled.
+  assert.doesNotMatch(form, /login-progress/, 'the progress bar is gone');
+
+  // The bar carried the announcement, so it is kept for screen readers.
   assert.match(form, /role="status"/);
+  assert.match(form, /aria-live="polite"/);
+  assert.match(form, /sr-only/);
+});
+
+test('nothing on the sign-in screen animates', () => {
+  const form = source('../components/login/CredentialForm.tsx');
+  const overlay = source('../components/login/WelcomeOverlay.tsx');
+  const styles = source('../app/globals.css');
+
+  // No spinner in the button, nothing pulsing.
+  assert.doesNotMatch(`${form}\n${overlay}`, /animate-(spin|pulse|fade)/, 'the sign-in screen must not animate');
+  assert.doesNotMatch(form, /Loader2/, 'the spinner icon is gone');
+
+  // The login section of the stylesheet declares no animations of its own.
+  const loginStart = styles.indexOf('LOGIN');
+  const loginCss = styles.slice(loginStart);
+
+  const keyframes = loginCss.match(/@keyframes\s+\S+/g) ?? [];
+  assert.deepEqual(keyframes, [], `the login stylesheet still defines keyframes: ${keyframes.join(', ')}`);
+
+  // Declarations inside the reduced-motion override are allowed, since that
+  // block exists to turn motion off.
+  const outsideReducedMotion = loginCss.split('prefers-reduced-motion')[0];
+  const animationDecls = outsideReducedMotion.match(/^\s+animation:/gm) ?? [];
+  assert.deepEqual(animationDecls, [], `animation declarations remain: ${animationDecls.length}`);
+
+  assert.doesNotMatch(styles, /login-progress-sweep|login-welcome-in/, 'the removed animations are still defined');
 });
 
 test('a failed sign-in says why straight away, with no coin language', () => {
@@ -136,8 +164,7 @@ test('the welcome overlay honours reduced motion', () => {
   const block = styles.slice(styles.indexOf('prefers-reduced-motion'));
 
   assert.match(styles, /prefers-reduced-motion/);
-  assert.match(block, /\.login-welcome/, 'the greeting must be able to stop fading in');
-  assert.match(block, /\.login-progress-bar/, 'the progress sweep must be able to stop');
+  assert.match(block, /\.login-welcome/, 'the greeting must be covered by the reduced-motion block');
 });
 
 test('the coin reader is gone from the codebase, not just unused', () => {

@@ -18,11 +18,19 @@ $caPath = env('DB_SSL_CA', env('MYSQL_ATTR_SSL_CA', '/etc/ssl/certs/ca-certifica
 $sslEnabled = (bool) (env('DB_SSL_CA') || env('MYSQL_ATTR_SSL_CA') || file_exists($caPath));
 
 $mysqlOptions = extension_loaded('pdo_mysql') ? array_filter([
-    // Off by default. It cuts the per-request TLS handshake, which is worth
-    // having on a 0.1 CPU instance, but it is opt-in so a problem with it
-    // cannot reach production on its own. Turn it on with DB_PERSISTENT=true
-    // once the connection has proved stable.
-    PDO::ATTR_PERSISTENT => env('DB_PERSISTENT', false),
+    // On by default. Six queries run per sign-in, and each one was paying a
+    // fresh TCP and TLS handshake to TiDB, which sits in ap-northeast-1 while
+    // the operator is in the Philippines. Keeping the connection alive across
+    // requests removes that handshake from the critical path.
+    //
+    // This was the change that took the deploy down once already, because
+    // array_merge() renumbered the PDO integer keys and silently dropped the
+    // TLS options, leaving TiDB to refuse an unencrypted connection. The keys
+    // are built explicitly below and a test reads them back through the
+    // constants, so that cannot happen again unnoticed.
+    //
+    // Escape hatch if a deployment ever misbehaves: DB_PERSISTENT=false.
+    PDO::ATTR_PERSISTENT => (bool) env('DB_PERSISTENT', true),
 
     PDO::MYSQL_ATTR_SSL_CA => $sslEnabled ? $caPath : null,
     PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT => $sslEnabled ? false : null,

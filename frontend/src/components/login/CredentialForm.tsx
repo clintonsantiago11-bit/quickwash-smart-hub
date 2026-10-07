@@ -1,6 +1,6 @@
 'use client';
 
-import { CheckCircle2, Eye, EyeOff, Loader2, LockKeyhole, Mail, ShieldAlert } from 'lucide-react';
+import { Eye, EyeOff, LockKeyhole, Mail, ShieldAlert } from 'lucide-react';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { isBlockingPhase, type FieldError, type LoginCredentials, type LoginPhase } from '@/lib/auth';
 
@@ -158,17 +158,16 @@ export default function CredentialForm({
         <span>Remember email</span>
       </label>
 
+      {/* Nothing moves here. The progress bar that used to sit under the
+          button is gone: it could only ever sweep, because there is no way
+          to know how far through the server's password hashing the request
+          is, and an unfillable bar reads as stalled rather than working.
+          The label change and the disabled button are the whole signal. */}
       <button type="submit" className="login-btn" disabled={isSubmitting}>
         {phase === 'verifying' ? (
-          <>
-            <Loader2 size={15} className="animate-spin" aria-hidden="true" />
-            Verifying…
-          </>
+          'Verifying…'
         ) : phase === 'success' ? (
-          <>
-            <CheckCircle2 size={15} aria-hidden="true" />
-            Signed in
-          </>
+          'Signed in'
         ) : phase === 'failed' ? (
           'Try again'
         ) : (
@@ -176,15 +175,11 @@ export default function CredentialForm({
         )}
       </button>
 
-      {/* Honest about the wait: password hashing on a small instance takes
-          seconds, and there is no way to know how far through it the server
-          is, so this runs rather than inventing a percentage. */}
-      {phase === 'verifying' && (
-        <div className="login-progress" role="status" aria-live="polite">
-          <span className="login-progress-bar" aria-hidden="true" />
-          <span className="sr-only">Verifying your credentials…</span>
-        </div>
-      )}
+      {/* The bar also carried the announcement, so keep it for screen
+          readers. Visually hidden and static. */}
+      <p className="sr-only" role="status" aria-live="polite">
+        {phase === 'verifying' ? 'Verifying your credentials.' : ''}
+      </p>
     </form>
   );
 }
