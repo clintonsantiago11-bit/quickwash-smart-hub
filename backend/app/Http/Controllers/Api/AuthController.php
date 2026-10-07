@@ -93,6 +93,19 @@ class AuthController extends Controller
 
         $token = $user->createToken('quickwash-token')->plainTextToken;
 
+        // Re-hash if the configured cost has changed since this password was
+        // last set. The cost is baked into the stored hash, so lowering
+        // BCRYPT_ROUNDS does nothing on its own: without this every existing
+        // account keeps being verified at the old cost and the saving never
+        // reaches them.
+        //
+        // rehash_on_login in config/hashing.php does NOT cover this. That hook
+        // belongs to Laravel's session guard, and this login is a Sanctum token
+        // issued by a controller, so it is never reached.
+        if (Hash::needsRehash($user->password_hash)) {
+            $user->forceFill(['password_hash' => Hash::make($request->password)])->save();
+        }
+
         // Stamped on every sign-in so the profile can show when the operator
         // was last seen, instead of the placeholder the UI used to render.
         $user->forceFill(['last_login_at' => Carbon::now()])->save();
