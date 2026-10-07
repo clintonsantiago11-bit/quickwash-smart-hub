@@ -15,12 +15,17 @@ import {
  * Closes a session that nobody is using.
  *
  * A terminal left signed in is an open door, so a few minutes of no input
- * raises a warning with a countdown, and ignoring it signs out. The warning
- * is deliberately modal: it has to be answered, not clicked past, and the
- * only ways out are "stay signed in" or "sign out".
+ * raises a warning with a countdown, and ignoring it signs out.
  *
- * Keyboard activity counts, so a code-running terminal is not signed out
- * mid-task.
+ * Once the warning is up it has to be answered with a button. It used to be
+ * dismissed by any input at all, which broke it completely: pointerdown is an
+ * activity event, so reaching for a button tore the dialog down on mouse-down
+ * and the click never landed on anything. Both buttons were dead and the only
+ * way out was to wait it out.
+ *
+ * So while the warning is showing, activity does nothing. It cannot dismiss
+ * the dialog and it cannot reset the clock. The sign-out deadline keeps
+ * running, so ignoring it still signs you out.
  */
 export default function IdleLogout() {
   const router = useRouter();
@@ -34,10 +39,50 @@ export default function IdleLogout() {
   // Mirrors the visible warning so the timer callback, which is created once,
   // reads the current value rather than a stale one captured at first render.
   const warned = useRef(false);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const stayRef = useRef<HTMLButtonElement>(null);
+
+  // True only while the dialog is on screen. Named so the focus effect has a
+  // plain boolean to depend on rather than an inline expression.
+  const warningVisible = remaining !== null;
 
   useEffect(() => {
     lastActivity.current = Date.now();
   }, []);
+
+  /**
+   * Keeps focus inside the dialog. aria-modal alone does not do this, so
+   * without it Tab walks straight out of the warning and into the page behind
+   * it, which an operator cannot see is still there.
+   */
+  useEffect(() => {
+    if (!warningVisible) return;
+
+    stayRef.current?.focus();
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Tab') return;
+
+      const focusable = dialogRef.current?.querySelectorAll<HTMLButtonElement>('button:not(:disabled)');
+      if (!focusable || focusable.length === 0) return;
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const active = document.activeElement;
+
+      if (event.shiftKey && active === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && active === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+    // Runs when the dialog opens or closes, not on every countdown tick.
+  }, [warningVisible]);
 
   const dismissWarning = useCallback(() => {
     warned.current = false;
@@ -70,14 +115,16 @@ export default function IdleLogout() {
   // timers we care about are measured in minutes.
   useEffect(() => {
     const onActivity = () => {
+      // Once the warning is up, input is ignored entirely. Not dismissing here
+      // is only half the fix: resetting the clock would trip the tick's own
+      // clear branch a moment later and tear the dialog down anyway, which is
+      // the same bug by another route.
+      if (warned.current) return;
+
       const now = Date.now();
       if (now - lastRecorded.current < ACTIVITY_THROTTLE_MS) return;
       lastRecorded.current = now;
       lastActivity.current = now;
-      // Any sign of life closes the warning. Without this the modal would sit
-      // there over an operator who is still working, counting down to a
-      // sign-out they never asked for.
-      if (warned.current) dismissWarning();
     };
 
     for (const event of ACTIVITY_EVENTS) {
@@ -88,7 +135,7 @@ export default function IdleLogout() {
         window.removeEventListener(event, onActivity);
       }
     };
-  }, [dismissWarning]);
+  }, []);
 
 
   // The clock itself. Cheap enough at 1s, and it only re-renders while the
@@ -103,28 +150,31 @@ export default function IdleLogout() {
         return;
       }
 
-      if (idleMs >= defaultIdleConfig.warnAfterMs) {
+      // Only ever raise the warning here. Clearing it on a quiet period would
+      // undo a decision the operator has not made yet.
+      if (!warned.current && idleMs >= defaultIdleConfig.warnAfterMs) {
         warned.current = true;
         setRemaining(secondsRemaining(idleMs));
       } else if (warned.current) {
-        dismissWarning();
+        setRemaining(secondsRemaining(idleMs));
       }
     };
 
     const timer = setInterval(tick, 1000);
     return () => clearInterval(timer);
-  }, [signOut, dismissWarning]);
+  }, [signOut]);
 
   if (remaining === null && !signingOut) return null;
 
   return (
     <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="idle-title"
-      aria-describedby="idle-detail"
-      className="fixed inset-0 z-[90] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
-    >
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="idle-title"
+        aria-describedby="idle-detail"
+        className="fixed inset-0 z-[90] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
+      >
       <div className="w-full max-w-sm rounded-2xl border border-[var(--border)] bg-[var(--bg-surface)] p-6 text-center shadow-2xl">
         <h2 id="idle-title" className="font-display text-lg font-bold">
           {signingOut ? 'Signing you out' : 'Still there?'}
@@ -144,6 +194,7 @@ export default function IdleLogout() {
 
             <div className="mt-6 flex flex-col gap-2 sm:flex-row">
               <button
+                ref={stayRef}
                 type="button"
                 onClick={stay}
                 className="btn btn-primary flex-1 py-3 text-xs font-black uppercase tracking-widest"
