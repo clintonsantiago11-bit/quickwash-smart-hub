@@ -118,7 +118,11 @@ class AuthController extends Controller
 
         return response()->json([
             'token' => $token,
-            'user' => $user,
+            // facility_name is not a column on users. The sign-in greeting
+            // names the facility an operator is now signed in to, so it is
+            // resolved here rather than left for the client to guess from an
+            // id it cannot look up.
+            'user' => $user->setAttribute('facility_name', $user->facility?->name),
         ])->withCookie($cookie);
     }
 
@@ -140,6 +144,9 @@ class AuthController extends Controller
 
     public function user(Request $request)
     {
-        return response()->json($request->user());
+        return response()->json(
+            $request->user()->load('facility')
+                ->setAttribute('facility_name', $request->user()->facility?->name)
+        );
     }
 }

@@ -4,228 +4,148 @@ import { test } from 'node:test';
 
 const source = (relativePath) => readFileSync(new URL(relativePath, import.meta.url), 'utf8');
 
-/**
- * Extracts one flat CSS rule by its exact opening selector. Slicing between
- * two indexOf() calls is unsafe here because a combined selector such as
- * ".a,\n.b {" also matches a search for ".b {", earlier in the file. Pass
- * { last: true } when the standalone rule is shadowed by such a combined one.
- */
-const ruleOf = (css, selector, { last = false } = {}) => {
-  const start = last ? css.lastIndexOf(selector) : css.indexOf(selector);
-  if (start < 0) return '';
-  const end = css.indexOf('\n}', start);
-  return end < 0 ? '' : css.slice(start, end + 2);
-};
+const loginUi = () =>
+  [
+    source('../app/login/page.tsx'),
+    source('../components/login/CredentialForm.tsx'),
+    source('../components/login/WelcomeOverlay.tsx'),
+  ].join('\n');
 
 test('login uses plain product copy without fake coin-terminal language', () => {
-  const page = source('../app/login/page.tsx');
   const form = source('../components/login/CredentialForm.tsx');
 
-  for (const copy of ['Email', 'Password', 'Remember email', 'Sign in']) {
+  for (const copy of ['Email', 'Password', 'Remember email']) {
     assert.match(form, new RegExp(`>\\s*${copy}\\s*<`), `expected form copy: ${copy}`);
   }
+  assert.match(form, /Sign in/, 'expected the submit button copy: Sign in');
+  assert.doesNotMatch(form, />\s*valid\s*</, 'unexpected login copy: valid');
+});
 
-  const loginUi = `${page}\n${form}`;
-  assert.match(form, /phase/);
-  assert.doesNotMatch(loginUi, />\s*valid\s*</, 'unexpected login copy: valid');
+test('no coin vocabulary survives anywhere in the sign-in flow', () => {
+  const ui = loginUi();
+
   for (const removed of [
-    'Operator Email',
-    'Password Access',
-    'Forgot Key?',
     'INSERT COIN',
+    'Insert coin',
     'CoinMech',
     'Faceplate',
     'Droplets',
+    'Coin accepted',
+    'Coin jammed',
+    'Retry coin',
+    'inserting',
+    'authenticating',
+    'rejecting',
+    'Operator Email',
+    'Password Access',
+    'Forgot Key?',
   ]) {
-    assert.doesNotMatch(loginUi, new RegExp(removed.replace('?', '\\?')), `unexpected login copy: ${removed}`);
+    assert.doesNotMatch(ui, new RegExp(removed.replace('?', '\\?')), `unexpected login copy: ${removed}`);
   }
 });
 
-test('the coin mechanism covers the screen as a card-sized modal dialog', () => {
-  const page = source('../app/login/page.tsx');
-  const overlay = source('../components/login/CoinSlotOverlay.tsx');
-  const styles = source('../app/globals.css');
-
-  assert.match(page, /<CoinSlotOverlay/);
-  assert.doesNotMatch(page, /CoinSlotFeedback/);
-
-  assert.match(overlay, /role="dialog"/);
-  assert.match(overlay, /aria-modal="true"/);
-  assert.match(overlay, /aria-labelledby="slot-stage-title"/);
-  assert.match(overlay, /stageRef\.current\?\.focus\(\)/);
-
-  // Nothing in the dialog is actionable, so Tab must not walk out behind
-  // the scrim into the disabled form.
-  assert.match(overlay, /onKeyDown=\{holdFocus\}/);
-  assert.match(overlay, /if \(event\.key !== 'Tab'\) return;/);
-  assert.match(overlay, /event\.preventDefault\(\);\s*\n\s*stageRef\.current\?\.focus\(\);/);
-
-  // Fixed to the whole viewport, and the stage is card-sized and centred.
-  assert.match(styles, /\.slot-scrim\s*\{[\s\S]*?position: fixed;/);
-  assert.match(styles, /\.slot-scrim\s*\{[\s\S]*?inset: 0;/);
-  assert.match(styles, /\.slot-scrim\s*\{[\s\S]*?place-items: center;/);
-  assert.match(styles, /\.slot-stage\s*\{[\s\S]*?width: min\(100%, 25\.5rem\)/);
-});
-
-test('the coin is a struck gold disc clipped by the slotway', () => {
-  const overlay = source('../components/login/CoinSlotOverlay.tsx');
-  const styles = source('../app/globals.css');
-
-  // The coin has to be a child of the clipping slotway, otherwise it slides
-  // in front of the machine instead of being swallowed by it.
-  assert.match(overlay, /className="slot-slotway"[\s\S]*?className="slot-coin"/);
-  assert.match(styles, /\.slot-slotway\s*\{[\s\S]*?overflow: hidden;/);
-
-  const coin = ruleOf(styles, '.slot-coin {');
-  assert.match(coin, /width: 5\.4rem;\s*\n\s*height: 5\.4rem;/);
-  assert.match(coin, /transform-style: preserve-3d;/);
-
-  // Gold, not the old cyan sphere.
-  const face = ruleOf(styles, '.slot-coin-face {');
-  assert.match(face, /radial-gradient\(circle at 42% 34%, #F7D278/);
-  assert.doesNotMatch(`${coin}${face}`, /#A5E4FF|#0EA5E9/);
-
-  // Two faces held apart in 3D, so the coin still shows an edge at the
-  // halfway point of the flip instead of collapsing to a hairline.
-  assert.match(face, /transform: translateZ\(2px\)/);
-  assert.match(styles, /\.slot-coin-face,\s*\n\.slot-coin-back \{[\s\S]*?backface-visibility: hidden;/);
-  assert.match(ruleOf(styles, '.slot-coin-back {', { last: true }), /transform: rotateY\(180deg\) translateZ\(2px\)/);
-  assert.match(overlay, /className="slot-coin-face" \/>/);
-  assert.match(overlay, /className="slot-coin-back" \/>/);
-
-  // A coin is flat with a raised rim, not a shaded sphere. The rim and the
-  // embossed droplet are what stop it reading as a ball.
-  const rim = ruleOf(styles, '.slot-coin-face::before {');
-  assert.match(rim, /inset 0 2px 0 rgba\(255, 240, 197/);
-  assert.match(rim, /inset 0 -2px 0 rgba\(86, 56, 6/);
-  const emblem = ruleOf(styles, '.slot-coin-face::after {');
-  assert.match(emblem, /border-radius: 50% 50% 50% 0/);
-  assert.match(emblem, /transform: rotate\(-45deg\)/);
-});
-
-
-test('the acceptor is drawn with a vertical slit, LED, plunger and engraving', () => {
-  const overlay = source('../components/login/CoinSlotOverlay.tsx');
-  const styles = source('../app/globals.css');
-
-  assert.match(overlay, /className="slot-acceptor"/);
-  assert.match(overlay, /slot-screw--tl/);
-  assert.match(overlay, /className="slot-bezel"/);
-  assert.match(overlay, /className="slot-face"/);
-  assert.match(overlay, /className="slot-led"/);
-  assert.match(overlay, /className="slot-plunger"/);
-  assert.match(overlay, /className="slot-engraving"/);
-
-  // A coin acceptor takes a coin through a narrow TALL slit. The old
-  // horizontal gap is a coin return and must not come back.
-  const slit = styles.slice(styles.indexOf('.slot-slit {'), styles.indexOf('.slot-beam {'));
-  assert.match(slit, /width: 1\.1rem;/);
-  assert.match(slit, /height: 4\.2rem;/);
-  assert.doesNotMatch(styles, /\.slot-plate|\.slot-lip/);
-
-  // The face panel is what occludes the coin below the mouth; without it
-  // the coin would be visible lying across the slit.
-  assert.match(styles, /\.slot-face\s*\{[\s\S]*?z-index: 3;/);
-
-  // Its transparent window has to be exactly as wide as the slit. A wider
-  // window leaves slivers beside the slit with the coin showing through.
-  const face = styles.slice(styles.indexOf('.slot-face {'), styles.indexOf('/* The bar the coin passes behind'));
-  const window = face.match(/transparent ([\d.]+)rem ([\d.]+)rem/);
-  assert.ok(window, 'the face needs a transparent window for the slit');
-  const windowWidth = Number(window[2]) - Number(window[1]);
-  assert.equal(
-    windowWidth,
-    1.1,
-    `the face window is ${windowWidth}rem but the slit is 1.1rem, so the coin leaks through`,
-  );
-
-  // The engraving is confined to the machine graphic, never to the product
-  // copy on the page or the form.
-  const page = source('../app/login/page.tsx');
-  const form = source('../components/login/CredentialForm.tsx');
-  assert.doesNotMatch(`${page}\n${form}`, /Insert coin/i);
-});
-
-test('the coin flips as it enters and tumbles back out when rejected', () => {
-  const styles = source('../app/globals.css');
-  assert.match(styles, /\.slot-mech \{[^}]*perspective: 700px;/);
-  assert.match(styles, /@keyframes slot-coin-feed \{[\s\S]*?rotateX\(360deg\)/);
-  assert.match(styles, /@keyframes slot-coin-return \{[\s\S]*?rotateX\(500deg\)/);
-  assert.match(styles, /@keyframes slot-plunger-fire/);
-  assert.match(styles, /@keyframes slot-beam-sweep/);
-
-  // The flip must land on a whole turn so the coin rests face-up showing its
-  // embossed emblem. Half a turn would leave it on its blank reverse.
-  assert.doesNotMatch(styles, /rotateX\(180deg\)/);
-  assert.doesNotMatch(styles, /rotateX\(150deg\)/);
-});
-
-test('a rejected credential catches the coin, returns it, then offers a retry', () => {
+test('the sign-in state machine has no phases left over from the coin reader', () => {
   const auth = source('./auth.ts');
-  const page = source('../app/login/page.tsx');
-  const form = source('../components/login/CredentialForm.tsx');
-  const sequence = source('./login-sequence.ts');
-  const styles = source('../app/globals.css');
 
-  for (const phase of ['inserting', 'authenticating', 'rejecting', 'jam', 'success', 'error']) {
-    assert.match(auth, new RegExp(`['"]${phase}['"]`));
+  // Four states: idle, verifying, success, failed. The other three that
+  // existed only to pace an animation are gone.
+  for (const phase of ['idle', 'verifying', 'success', 'failed']) {
+    assert.match(auth, new RegExp(`['"]${phase}['"]`), `missing phase: ${phase}`);
   }
 
-  assert.match(sequence, /credentials'\) return 'rejecting'/);
-  assert.match(page, /terminalPhase\(kind\)/);
-  assert.match(page, /setPhase\('rejecting'\)/);
-  assert.match(page, /setPhase\('jam'\)/);
-  assert.match(page, /await wait\(totalRejectMs\(\)\)/);
-
-  // Catch first, return second, on separate properties of the same disc.
-  assert.match(styles, /@keyframes slot-coin-catch/);
-  assert.match(styles, /@keyframes slot-coin-return/);
-  assert.match(
-    styles,
-    /slot-coin-catch 280ms[^\n]*slot-coin-return 420ms[^\n]*280ms/,
-  );
-  assert.match(styles, /\.slot-scrim\[data-phase='rejecting'\] \.slot-blocker \{ opacity: 1; \}/);
-
-  // The retry is the sign-in button itself, relabelled, and it is only
-  // reachable once the coin has been ejected and the form is live again.
-  assert.match(form, /'Retry coin'/);
-  assert.match(form, /isBlockingPhase\(phase\)/);
-  assert.match(page, /phase !== 'jam' && phase !== 'error' && \(/);
+  assert.doesNotMatch(auth, /inserting|authenticating|rejecting|'jam'/, 'a pacing phase survived');
+  assert.match(auth, /isBlockingPhase/);
+  assert.match(auth, /phase === 'verifying' \|\| phase === 'success'/);
 });
 
-test('signing in posts the credential immediately instead of waiting on a fake delay', () => {
+test('a successful sign-in greets the operator by name and role', () => {
   const page = source('../app/login/page.tsx');
-  const sequence = source('./login-sequence.ts');
+  const overlay = source('../components/login/WelcomeOverlay.tsx');
 
-  assert.doesNotMatch(page, /COIN_INSERT_MS = 520/, 'the old blocking delay is gone');
-  assert.match(page, /const startedAt = performance\.now\(\)/);
-  assert.match(page, /api\.login\(credentials\.email, credentials\.password\)/);
-  assert.match(page, /shouldHoldResult\(elapsed\)/);
-  assert.match(page, /phaseWhilePending\(performance\.now\(\) - startedAt\)/);
-  assert.match(sequence, /COIN_MIN_VISIBLE_MS/);
+  assert.match(page, /<WelcomeOverlay/);
+  assert.doesNotMatch(page, /CoinSlotOverlay|login-sequence/);
+
+  // The greeting reads out the name, role and facility. On a shared terminal
+  // that is the whole point of the screen.
+  assert.match(page, /greeting\(/);
+  assert.match(page, /greetingName\(/);
+  assert.match(page, /welcomeDetail\(/);
+
+  assert.match(overlay, /login-welcome-title/);
+  assert.match(overlay, /login-welcome-detail/);
+  assert.match(overlay, /Continue to dashboard/);
 });
 
-test('a jam clears the password and keeps the email; a network fault keeps both', () => {
+test('the greeting is decided by whether this browser has signed in before', () => {
+  const page = source('../app/login/page.tsx');
+
+  assert.match(page, /isReturningVisitor\(localStorage\.getItem\(LAST_SIGN_IN_KEY\)\)/);
+  // Read before written, or the very first sign-in would read as a return.
+  assert.match(page, /localStorage\.setItem\(LAST_SIGN_IN_KEY/);
+  assert.ok(
+    page.indexOf('LAST_SIGN_IN_KEY)') < page.indexOf('LAST_SIGN_IN_KEY, new Date()'),
+    'the previous sign-in must be read before this one is written',
+  );
+
+  // Deliberately not keyed on the remembered email: that is only written when
+  // "Remember email" is ticked, so it would greet a returning operator as new.
+  assert.match(page, /remembered_email/);
+});
+
+test('the waiting state is honest about a wait it cannot measure', () => {
+  const page = source('../app/login/page.tsx');
   const form = source('../components/login/CredentialForm.tsx');
 
-  assert.match(form, /if \(phase !== 'jam'\) return;/);
+  assert.match(page, /setPhase\('verifying'\)/);
+  assert.match(form, /Verifying/);
+  assert.match(form, /login-progress/);
+
+  // No percentage: password hashing takes seconds on a small instance and
+  // there is no way to know how far through it the server is.
+  assert.doesNotMatch(form, /%\s*}/, 'an invented percentage would be a lie about a security step');
+  assert.match(form, /login-progress-bar/);
+  assert.match(form, /role="status"/);
+});
+
+test('a failed sign-in says why straight away, with no coin language', () => {
+  const page = source('../app/login/page.tsx');
+  const form = source('../components/login/CredentialForm.tsx');
+
+  assert.match(page, /setPhase\('failed'\)/);
+  assert.match(page, /That email and password do not match/);
+  assert.match(form, /'Try again'/);
+
+  // The old flow waited 700ms for a coin to be thrown out of a slot before
+  // showing the reason. Nothing should stand between the operator and the
+  // explanation.
+  assert.doesNotMatch(page, /totalRejectMs|await wait\(/, 'an artificial delay survived');
+  assert.doesNotMatch(source('./auth.ts'), /inserting|authenticating/);
+});
+
+test('a failure keeps the email and clears the password', () => {
+  const form = source('../components/login/CredentialForm.tsx');
+
+  assert.match(form, /if \(phase !== 'failed'\) return;/);
   assert.match(form, /setPassword\(''\)/);
   assert.doesNotMatch(form, /setEmail\(''\)/);
   assert.match(form, /passwordRef\.current\?\.focus\(\)/);
 });
 
-test('the coin mechanism honours reduced motion in every state', () => {
+test('the welcome overlay honours reduced motion', () => {
   const styles = source('../app/globals.css');
   const block = styles.slice(styles.indexOf('prefers-reduced-motion'));
 
   assert.match(styles, /prefers-reduced-motion/);
-  for (const phase of ['inserting', 'authenticating', 'rejecting', 'success']) {
-    assert.match(
-      block,
-      new RegExp(`slot-scrim\\[data-phase='${phase}'\\] \\.slot-coin`),
-      `reduced motion must hold a static coin position for: ${phase}`,
-    );
-  }
+  assert.match(block, /\.login-welcome/, 'the greeting must be able to stop fading in');
+  assert.match(block, /\.login-progress-bar/, 'the progress sweep must be able to stop');
+});
+
+test('the coin reader is gone from the codebase, not just unused', () => {
+  const css = source('../app/globals.css');
+  const page = source('../app/login/page.tsx');
+
+  assert.doesNotMatch(css, /\.slot-/, 'coin CSS survived');
+  assert.doesNotMatch(page, /CoinSlot|login-sequence/);
 });
 
 test('QuickWash branding uses the supplied PNG without SVG wrappers', () => {

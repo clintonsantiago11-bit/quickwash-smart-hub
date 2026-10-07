@@ -1,14 +1,14 @@
 'use client';
 
-import { Eye, EyeOff, LockKeyhole, Mail } from 'lucide-react';
+import { CheckCircle2, Eye, EyeOff, Loader2, LockKeyhole, Mail, ShieldAlert } from 'lucide-react';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { CoinSlotNotice } from '@/components/login/CoinSlotOverlay';
 import { isBlockingPhase, type FieldError, type LoginCredentials, type LoginPhase } from '@/lib/auth';
 
 interface CredentialFormProps {
   onSubmit: (data: LoginCredentials) => FieldError | null;
   fieldError: FieldError | null;
-  notice: { phase: Extract<LoginPhase, 'jam' | 'error'>; message: string } | null;
+  /** Reason the last attempt failed, or '' when there is nothing to report. */
+  message: string;
   phase: LoginPhase;
   onClearError: () => void;
 }
@@ -16,7 +16,7 @@ interface CredentialFormProps {
 export default function CredentialForm({
   onSubmit,
   fieldError,
-  notice,
+  message,
   phase,
   onClearError,
 }: CredentialFormProps) {
@@ -40,11 +40,12 @@ export default function CredentialForm({
     }
   }, []);
 
-  // A rejected coin is the operator's problem, not a machine fault, so the
-  // email stays and the password is cleared ready to be retyped. A network or
-  // server failure leaves both fields alone — nothing was wrong with them.
+// A rejected credential is the operator's mistake, not a fault on the
+  // machine, so the email is kept and the password is cleared ready to be
+  // retyped. A network or server failure leaves both fields alone, because
+  // nothing was wrong with what they typed.
   useEffect(() => {
-    if (phase !== 'jam') return;
+    if (phase !== 'failed') return;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setPassword('');
     passwordRef.current?.focus();
@@ -68,7 +69,12 @@ export default function CredentialForm({
 
   return (
     <form onSubmit={submit} noValidate className="login-form">
-      {notice && <CoinSlotNotice phase={notice.phase} message={notice.message} />}
+      {message && (
+        <div className="login-alert" role="alert">
+          <ShieldAlert size={16} aria-hidden="true" />
+          <p>{message}</p>
+        </div>
+      )}
 
       <div className="login-field-group">
         <label htmlFor="login-email" className="login-label">Email</label>
@@ -153,20 +159,32 @@ export default function CredentialForm({
       </label>
 
       <button type="submit" className="login-btn" disabled={isSubmitting}>
-        {phase === 'inserting'
-          ? 'Inserting…'
-          : phase === 'authenticating'
-            ? 'Authenticating…'
-            : phase === 'rejecting'
-              ? 'Rejecting…'
-              : phase === 'success'
-                ? 'Accepted…'
-                : phase === 'jam'
-                  ? 'Retry coin'
-                  : phase === 'error'
-                    ? 'Try again'
-                    : <span>Sign in</span>}
+        {phase === 'verifying' ? (
+          <>
+            <Loader2 size={15} className="animate-spin" aria-hidden="true" />
+            Verifying…
+          </>
+        ) : phase === 'success' ? (
+          <>
+            <CheckCircle2 size={15} aria-hidden="true" />
+            Signed in
+          </>
+        ) : phase === 'failed' ? (
+          'Try again'
+        ) : (
+          <span>Sign in</span>
+        )}
       </button>
+
+      {/* Honest about the wait: password hashing on a small instance takes
+          seconds, and there is no way to know how far through it the server
+          is, so this runs rather than inventing a percentage. */}
+      {phase === 'verifying' && (
+        <div className="login-progress" role="status" aria-live="polite">
+          <span className="login-progress-bar" aria-hidden="true" />
+          <span className="sr-only">Verifying your credentials…</span>
+        </div>
+      )}
     </form>
   );
 }
