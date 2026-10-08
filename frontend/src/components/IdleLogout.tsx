@@ -1,13 +1,14 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import {
   ACTIVITY_EVENTS,
   ACTIVITY_THROTTLE_MS,
   defaultIdleConfig,
   formatCountdown,
+  idleSignInHref,
   secondsRemaining,
 } from '@/lib/idle';
 
@@ -15,7 +16,7 @@ import {
  * Closes a session that nobody is using.
  *
  * A terminal left signed in is an open door, so a few minutes of no input
- * raises a warning with a countdown, and ignoring it signs out.
+ * raises a warning with a countdown, and ignoring it signs you out.
  *
  * Once the warning is up it has to be answered with a button. It used to be
  * dismissed by any input at all, which broke it completely: pointerdown is an
@@ -26,8 +27,27 @@ import {
  * So while the warning is showing, activity does nothing. It cannot dismiss
  * the dialog and it cannot reset the clock. The sign-out deadline keeps
  * running, so ignoring it still signs you out.
+ *
+ * This component lives in the root layout and so survives navigation. The
+ * remount below is what keeps a completed sign-out from leaving the overlay
+ * stranded on top of the next page.
  */
 export default function IdleLogout() {
+  const pathname = usePathname();
+
+  // Nothing to guard while signed out. Rendering on the sign-in page is what
+  // left a full-screen overlay stuck there swallowing every click, so the
+  // operator had to refresh the browser to get their page back.
+  if (pathname === '/login') return null;
+
+  // Keyed on the route so a fresh page starts with a clean clock and a clean
+  // set of latches. Moving between pages is itself activity, so re-arming here
+  // is also the right behaviour: someone working across the dashboard should
+  // not be signed out for it.
+  return <IdleWatcher key={pathname} />;
+}
+
+function IdleWatcher() {
   const router = useRouter();
   const [remaining, setRemaining] = useState<number | null>(null);
   const [signingOut, setSigningOut] = useState(false);
@@ -81,30 +101,39 @@ export default function IdleLogout() {
 
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
-    // Runs when the dialog opens or closes, not on every countdown tick.
   }, [warningVisible]);
-
-  const dismissWarning = useCallback(() => {
-    warned.current = false;
-    setRemaining(null);
-  }, []);
 
   const signOut = useCallback(async () => {
     if (signingOutRef.current) return;
     signingOutRef.current = true;
     setSigningOut(true);
-    try {
-      await api.logout();
-    } catch {
-      // A failed sign-out must still clear the browser session, or the token
-      // would survive the next person to use the machine.
-      api.setToken(null);
-    }
-    if (typeof window !== 'undefined') {
+
+    // Clear the browser session first, before any network call.
+    //
+    // This used to await the server logout before clearing anything, and the
+    // dashboard answers that request in several seconds. The operator watched a
+    // dead "Signing you out" overlay for the whole time with no way out, and a
+    // slow response left them stuck. Nothing about leaving needs the server to
+    // agree first: the local token and cookie are what make the session.
+    api.setToken(null);
+    if (typeof document !== 'undefined') {
       document.cookie = 'qhs_session=; Max-Age=0; path=/';
     }
-    router.push('/login');
+
+    // Tell the server afterwards, without waiting on it. A failure only leaves
+    // the token row behind, which expires on its own.
+    void api.logout().catch(() => undefined);
+
+    // reason=idle lets the sign-in page explain what happened and offer a way
+    // back in, rather than the operator arriving at a bare form wondering why
+    // they were thrown out.
+    router.push(idleSignInHref());
   }, [router]);
+
+  const dismissWarning = useCallback(() => {
+    warned.current = false;
+    setRemaining(null);
+  }, []);
 
   const stay = useCallback(() => {
     lastActivity.current = Date.now();
@@ -137,7 +166,6 @@ export default function IdleLogout() {
     };
   }, []);
 
-
   // The clock itself. Cheap enough at 1s, and it only re-renders while the
   // warning is actually on screen.
   useEffect(() => {
@@ -168,9 +196,9 @@ export default function IdleLogout() {
     // out with no warning at all, which reads as the site throwing them out
     // rather than the site protecting them.
     //
-    // A tab that was hidden is given the warning instead, on the reasoning
-    // that returning to the machine is itself the activity it should count
-    // as, and the sign-out still happens if they walk away again.
+    // A tab that was hidden is given the warning instead, on the reasoning that
+    // returning to the machine is itself the activity it should count as, and
+    // the sign-out still happens if they walk away again.
     const onVisibility = () => {
       if (document.hidden || warned.current) return;
 
@@ -193,13 +221,13 @@ export default function IdleLogout() {
 
   return (
     <div
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="idle-title"
-        aria-describedby="idle-detail"
-        className="fixed inset-0 z-[90] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
-      >
+      ref={dialogRef}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="idle-title"
+      aria-describedby="idle-detail"
+      className="fixed inset-0 z-[90] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
+    >
       <div className="w-full max-w-sm rounded-2xl border border-[var(--border)] bg-[var(--bg-surface)] p-6 text-center shadow-2xl">
         <h2 id="idle-title" className="font-display text-lg font-bold">
           {signingOut ? 'Signing you out' : 'Still there?'}

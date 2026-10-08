@@ -14,8 +14,29 @@ export const IDLE_WARN_AFTER_MS = 5 * 60 * 1000;
  */
 export const IDLE_SIGNOUT_AFTER_MS = IDLE_WARN_AFTER_MS + 60 * 1000;
 
-export type IdlePhase = 'active' | 'warning';
+/**
+ * Query flag carried to the sign-in page after an idle sign-out, so the
+ * operator is told what happened and handed a way back in instead of landing
+ * on a bare login form and wondering why they were thrown out.
+ */
+export const IDLE_REASON_PARAM = 'reason';
+export const IDLE_REASON_VALUE = 'idle';
 
+export function idleSignInHref(): string {
+  return `/login?${IDLE_REASON_PARAM}=${IDLE_REASON_VALUE}`;
+}
+
+/** True when this visit to /login follows an idle sign-out. */
+export function isIdleSignIn(search: string): boolean {
+  return new URLSearchParams(search).get(IDLE_REASON_PARAM) === IDLE_REASON_VALUE;
+}
+
+/** The sign-in URL with the idle notice stripped, used by its close button. */
+export function clearIdleSignInHref(): string {
+  return '/login';
+}
+
+export type IdlePhase = 'active' | 'warning';
 export interface IdleConfig {
   warnAfterMs: number;
   signOutAfterMs: number;

@@ -1,8 +1,8 @@
 'use client';
 
-import { ShieldCheck } from 'lucide-react';
+import { ShieldCheck, Timer, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { api, LoginError, type LoginErrorKind } from '@/lib/api';
 import WelcomeOverlay from '@/components/login/WelcomeOverlay';
 import {
@@ -20,6 +20,7 @@ import {
   isReturningVisitor,
   welcomeDetail,
 } from '@/lib/welcome';
+import { clearIdleSignInHref, isIdleSignIn } from '@/lib/idle';
 import CredentialForm from '@/components/login/CredentialForm';
 import QuickWashMark from '@/components/QuickWashMark';
 
@@ -32,9 +33,11 @@ const failureMessages: Record<LoginErrorKind, string> = {
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const redirectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const attemptId = useRef(0);
   const [phase, setPhase] = useState<LoginPhase>('idle');
+  const [timedOut, setTimedOut] = useState(() => isIdleSignIn(searchParams.toString()));
   const [serverMessage, setServerMessage] = useState('');
   const [fieldError, setFieldError] = useState<FieldError | null>(null);
   const [welcome, setWelcome] = useState<{ text: string; detail: string } | null>(null);
@@ -114,6 +117,13 @@ export default function LoginPage() {
     [authenticate]
   );
 
+  const dismissTimedOutNotice = useCallback(() => {
+    setTimedOut(false);
+    // Drop the flag from the address bar too, so a refresh or a shared link
+    // does not bring the notice back on an ordinary sign-in.
+    router.replace(clearIdleSignInHref());
+  }, [router]);
+
   const clearError = useCallback(() => {
     setFieldError(null);
     setServerMessage('');
@@ -168,6 +178,37 @@ export default function LoginPage() {
             <h2 id="login-heading">Sign in</h2>
             <p>Enter your details to access the operations hub.</p>
           </div>
+
+          {/* Shown only after an idle sign-out, and closeable. Without this the
+              operator lands on a bare form after being signed out and has no
+              idea why; the notice explains it and puts them straight back in. */}
+          {timedOut && (
+            <div
+              role="status"
+              className="mt-5 flex items-start gap-3 rounded-xl border px-4 py-3"
+              style={{ borderColor: 'rgba(251,191,36,0.35)', background: 'rgba(120,53,15,0.16)' }}
+            >
+              <Timer size={16} className="mt-0.5 shrink-0" style={{ color: '#FCD34D' }} aria-hidden="true" />
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-bold" style={{ color: '#FCD34D' }}>
+                  Signed out after 5 minutes of inactivity
+                </p>
+                <p className="mt-1 text-[11px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+                  This terminal signs you out on its own so the next person cannot use
+                  your session. Sign in again to carry on.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={dismissTimedOutNotice}
+                aria-label="Dismiss this notice"
+                className="shrink-0 rounded-lg p-1 transition-colors hover:bg-white/5"
+                style={{ color: 'var(--text-muted)' }}
+              >
+                <X size={15} aria-hidden="true" />
+              </button>
+            </div>
+          )}
 
           <CredentialForm
             onSubmit={handleSubmit}
