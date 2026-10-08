@@ -28,6 +28,13 @@ final class AuditRetention
      */
     public const DELETE_CHUNK = 500;
 
+    /**
+     * Hard ceiling on how many chunks a single run may delete. A run that has
+     * not finished by then leaves the rest for the next one, which is far
+     * better than holding the table under sustained write pressure.
+     */
+    public const MAX_PRUNE_PASSES = 2000;
+
     /** The instant before which rows are eligible for deletion. */
     public static function cutoff(int $days, ?\DateTimeInterface $now = null): \DateTimeImmutable
     {
@@ -94,12 +101,23 @@ final class AuditRetention
      *
      * Ordered by id so each chunk is a contiguous range, and the loop keeps
      * going until nothing is left rather than assuming one pass is enough.
+     *
+     * It also stops if a pass makes no progress. The original loop condition
+     * was `while ($chunk > 0)`, which is a constant and so never terminated
+     * on its own: if delete() reported nothing while the rows were still
+     * there, a permission error or a lost race under TiDB, it would re-read
+     * the same ids forever and pin the database at full tilt.
      */
     public static function prune(\DateTimeInterface $cutoff, int $chunk = self::DELETE_CHUNK): int
     {
-        $deleted = 0;
+        if ($chunk < 1) {
+            return 0;
+        }
 
-        do {
+        $deleted = 0;
+        $passes = 0;
+
+        while (true) {
             $ids = \App\Models\AuditLog::where('created_at', '<', $cutoff)
                 ->orderBy('id')
                 ->limit($chunk)
@@ -109,8 +127,20 @@ final class AuditRetention
                 break;
             }
 
-            $deleted += \App\Models\AuditLog::whereIn('id', $ids)->delete();
-        } while ($chunk > 0);
+            $removed = \App\Models\AuditLog::whereIn('id', $ids)->delete();
+
+            // Rows matched but nothing went: something is holding them. Give up
+            // rather than spin. The next scheduled run can try again.
+            if ($removed === 0) {
+                break;
+            }
+
+            $deleted += $removed;
+
+            if (++$passes >= self::MAX_PRUNE_PASSES) {
+                break;
+            }
+        }
 
         return $deleted;
     }

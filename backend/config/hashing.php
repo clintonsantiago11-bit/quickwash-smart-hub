@@ -40,5 +40,15 @@ return [
         'verify' => true,
     ],
 
-    'rehash_on_login' => true,
+    /*
+    | Laravel's own rehash_on_login hook is deliberately NOT set here.
+    |
+    | It belongs to the session guard, and this API authenticates with a
+    | Sanctum token issued by AuthController, so that hook is never reached
+    | and would have been a setting that looks like it upgrades stored
+    | hashes and silently does nothing. The upgrade is done explicitly in
+    | AuthController::login with Hash::needsRehash() instead.
+    |
+    */
+
 ];

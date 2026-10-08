@@ -80,11 +80,19 @@ public function test_password_hashing_defaults_to_the_cheaper_cost(): void
 {
     $hashing = $this->configWithRoundsCleared();
 
-    $this->assertSame(10, $hashing['bcrypt']['rounds'], 'the shipped default should be 10 on this hardware');
-    $this->assertGreaterThanOrEqual(10, $hashing['bcrypt']['rounds'], 'never below the OWASP recommended minimum');
-    $this->assertTrue($hashing['bcrypt']['verify'], 'verify stays on or a tampered hash would be accepted');
-    $this->assertTrue($hashing['rehash_on_login'], 'existing hashes get upgraded on the next sign-in');
-}
+        $this->assertSame(10, $hashing['bcrypt']['rounds'], 'the shipped default should be 10 on this hardware');
+        $this->assertGreaterThanOrEqual(10, $hashing['bcrypt']['rounds'], 'never below the OWASP recommended minimum');
+        $this->assertTrue($hashing['bcrypt']['verify'], 'verify stays on or a tampered hash would be accepted');
+
+        // rehash_on_login is Laravel's session-guard hook. This API signs in
+        // with a Sanctum token from a controller, so it is never reached and
+        // would be a setting that looks like it works and does not.
+        $this->assertArrayNotHasKey(
+            'rehash_on_login',
+            $hashing,
+            'the inert session-guard hook should not be advertised here',
+        );
+    }
 
 public function test_the_rounds_default_still_honours_the_environment(): void
 {

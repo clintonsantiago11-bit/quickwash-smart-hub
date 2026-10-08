@@ -21,10 +21,10 @@ interface WelcomeOverlayProps {
  * already automatic, and a dialog here would be one more thing to dismiss.
  */
 export default function WelcomeOverlay({ text, detail, onSkip }: WelcomeOverlayProps) {
-  const ref = useRef<HTMLButtonElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
-    ref.current?.focus();
+    buttonRef.current?.focus();
   }, []);
 
   return (
@@ -32,8 +32,10 @@ export default function WelcomeOverlay({ text, detail, onSkip }: WelcomeOverlayP
       className="login-welcome"
       role="status"
       aria-live="polite"
-      onClick={onSkip}
     >
+      {/* The card itself is not clickable: only the button is, so keyboard
+          and pointer users get the same target. The overlay is dismissed by
+          the automatic redirect, or by pressing this. */}
       <div className="login-welcome-card">
         <span className="login-welcome-mark" aria-hidden="true">
           <CheckCircle2 size={30} />
@@ -43,7 +45,7 @@ export default function WelcomeOverlay({ text, detail, onSkip }: WelcomeOverlayP
         <p className="login-welcome-detail">{detail}</p>
 
         <button
-          ref={ref}
+          ref={buttonRef}
           type="button"
           onClick={onSkip}
           className="login-welcome-go"

@@ -11,6 +11,13 @@ const SESSION_COOKIE = 'qhs_session';
 const SESSION_COOKIE_TTL_SECONDS = 8 * 60 * 60; // mirrors SANCTUM_TOKEN_EXPIRATION
 const SESSION_COOKIE_ATTRS = `path=/; max-age=${SESSION_COOKIE_TTL_SECONDS}; SameSite=Lax`;
 
+/**
+ * Fired when the API rejects the stored token. The root layout listens and
+ * routes to /login client-side. Exported so the listener and the dispatcher
+ * cannot drift apart.
+ */
+export const UNAUTHORIZED_EVENT = 'quickwash:unauthorized';
+
 function setSessionCookie() {
   if (typeof window === 'undefined') return;
   const secure = window.location.protocol === 'https:' ? '; Secure' : '';
@@ -119,8 +126,14 @@ class ApiClient {
       this.setToken(null);
       localStorage.removeItem('isAuthenticated');
       clearSessionCookie();
+
+      // Ask the shell to navigate, rather than assigning location.href.
+      // A hard navigation tears down the whole app, so an expired token
+      // silently discarded whatever the operator had on screen, mid-form,
+      // with no explanation. The root layout listens for this and routes
+      // client-side, which keeps the transition soft.
       if (typeof window !== 'undefined') {
-        window.location.href = '/login';
+        window.dispatchEvent(new CustomEvent(UNAUTHORIZED_EVENT));
       }
       throw new Error('Unauthorized');
     }

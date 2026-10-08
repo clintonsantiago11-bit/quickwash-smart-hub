@@ -410,7 +410,6 @@ Sign-in welcome + verifying progress.
   padding: 1.5rem;
   background: rgba(4, 10, 18, 0.86);
   backdrop-filter: blur(10px);
-  cursor: pointer;
 }
 .login-welcome-card {
   display: grid;

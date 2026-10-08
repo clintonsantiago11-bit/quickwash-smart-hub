@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { api } from '@/lib/api';
+import { usePolling } from '@/lib/usePolling';
 import { exportRows, type ExportFormat } from '@/lib/export';
 import {
   retentionMessage,
@@ -123,16 +124,15 @@ export default function AuditLogPage() {
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    fetchLogs();
-    const interval = setInterval(() => fetchLogs(), 3000);
-    const onFocus = () => fetchLogs();
-    window.addEventListener('focus', onFocus);
-    return () => {
-      clearInterval(interval);
-      window.removeEventListener('focus', onFocus);
-    };
+    void fetchLogs();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Ten seconds rather than three. At roughly two seconds a request, a
+  // three second poll meant this single page was asking for the API
+  // constantly, and the live-looking log did not need it: an audit trail is
+  // something you read, not something you watch.
+  usePolling(() => void fetchLogs(), { everyMs: 10000, jitterMs: 2000 });
 
   // Warn about retention separately from the log itself, and only once. The
   // answer changes daily when the cleanup runs, so there is no reason to

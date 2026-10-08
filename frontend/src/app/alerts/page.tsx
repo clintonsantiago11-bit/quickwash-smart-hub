@@ -4,6 +4,7 @@ import Header from '@/components/Header';
 import { AlertTriangle, CheckCircle, Info } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { api } from '@/lib/api';
+import { usePolling } from '@/lib/usePolling';
 
 interface AlertItem {
   id: number;
@@ -20,21 +21,24 @@ export default function AlertsPage() {
   const [activeCount, setActiveCount] = useState(0);
   const [resolvedCount, setResolvedCount] = useState(0);
 
+  const fetchAlerts = async () => {
+    try {
+      const data = await api.getAlerts();
+      setAlerts(data);
+      setActiveCount(data.filter((a: AlertItem) => a.status === 'active').length);
+      setResolvedCount(data.filter((a: AlertItem) => a.status === 'resolved').length);
+    } catch {
+      console.warn('Alerts backend unavailable');
+    }
+  };
+
   useEffect(() => {
-    const fetchAlerts = async () => {
-      try {
-        const data = await api.getAlerts();
-        setAlerts(data);
-        setActiveCount(data.filter((a: AlertItem) => a.status === 'active').length);
-        setResolvedCount(data.filter((a: AlertItem) => a.status === 'resolved').length);
-      } catch {
-        console.warn('Alerts backend unavailable');
-      }
-    };
-    fetchAlerts();
-    const interval = setInterval(fetchAlerts, 10000);
-    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void fetchAlerts();
   }, []);
+
+  usePolling(() => void fetchAlerts(), { everyMs: 10000, jitterMs: 2000 });
+
 
   const handleResolve = async (id: number) => {
     try {

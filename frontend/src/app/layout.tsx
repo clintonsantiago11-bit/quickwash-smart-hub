@@ -4,6 +4,7 @@ import "./globals.css";
 import { UIProvider } from "@/providers/UIProvider";
 import LayoutContent from "@/components/LayoutContent";
 import IdleLogout from "@/components/IdleLogout";
+import SessionWatcher from "@/components/SessionWatcher";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -41,6 +42,8 @@ export default function RootLayout({
           {/* Signs an unattended terminal out, so the next person at the
               machine does not inherit the last operator's session. */}
           <IdleLogout />
+          {/* Routes to /login when an expired token is rejected. */}
+          <SessionWatcher />
         </UIProvider>
       </body>
     </html>

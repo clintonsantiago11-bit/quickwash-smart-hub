@@ -4,6 +4,7 @@ import Header from '@/components/Header';
 import { Cpu, Wifi, Activity, RefreshCw } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { api } from '@/lib/api';
+import { usePolling } from '@/lib/usePolling';
 
 interface DeviceItem {
   id: string;
@@ -26,20 +27,25 @@ export default function DevicesPage() {
   const [onlineCount, setOnlineCount] = useState(0);
   const [sendingId, setSendingId] = useState<string | null>(null);
 
+  const fetchDevices = async () => {
+    try {
+      const data = await api.getDevices();
+      setDevices(data);
+      setOnlineCount(data.filter((d: DeviceItem) => d.status === 'online').length);
+    } catch {
+      console.warn('Devices backend unavailable');
+    }
+  };
+
   useEffect(() => {
-    const fetchDevices = async () => {
-      try {
-        const data = await api.getDevices();
-        setDevices(data);
-        setOnlineCount(data.filter((d: DeviceItem) => d.status === 'online').length);
-      } catch {
-        console.warn('Devices backend unavailable');
-      }
-    };
-    fetchDevices();
-    const interval = setInterval(fetchDevices, 15000);
-    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void fetchDevices();
   }, []);
+
+  // Pauses while the tab is hidden, and jitters so several terminals do not
+  // poll in lockstep. The API is the smallest thing in the stack.
+  usePolling(() => void fetchDevices(), { everyMs: 15000, jitterMs: 3000 });
+
 
   const handleRestart = async (deviceId: string) => {
     setSendingId(deviceId);

@@ -4,6 +4,7 @@ import Header from '@/components/Header';
 import { Coins, ListOrdered } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { api } from '@/lib/api';
+import { usePolling } from '@/lib/usePolling';
 
 interface TransactionItem {
   id: string;
@@ -18,24 +19,27 @@ export default function VendingPage() {
   const [totalCollected, setTotalCollected] = useState(0);
   const [todayCount, setTodayCount] = useState(0);
 
+  const fetchData = async () => {
+    try {
+      const [txns, stats] = await Promise.all([
+        api.getTransactions(),
+        api.getVendingStats(),
+      ]);
+      setTransactions(txns.data || txns);
+      setTotalCollected(stats.today_collected || 0);
+      setTodayCount(stats.today_transactions || 0);
+    } catch {
+      console.warn('Vending backend unavailable');
+    }
+  };
+
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [txns, stats] = await Promise.all([
-          api.getTransactions(),
-          api.getVendingStats(),
-        ]);
-        setTransactions(txns.data || txns);
-        setTotalCollected(stats.today_collected || 0);
-        setTodayCount(stats.today_transactions || 0);
-      } catch {
-        console.warn('Vending backend unavailable');
-      }
-    };
-    fetchData();
-    const interval = setInterval(fetchData, 15000);
-    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void fetchData();
   }, []);
+
+  usePolling(() => void fetchData(), { everyMs: 15000, jitterMs: 3000 });
+
   return (
     <>
       <Header title="Vending Transactions" subtitle="Detailed log of all payments" />

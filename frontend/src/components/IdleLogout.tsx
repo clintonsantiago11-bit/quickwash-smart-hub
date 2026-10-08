@@ -161,7 +161,32 @@ export default function IdleLogout() {
     };
 
     const timer = setInterval(tick, 1000);
-    return () => clearInterval(timer);
+
+    // Browsers throttle timers in a background tab, so the clock stops while
+    // it is hidden and the first tick on return can land past the sign-out
+    // deadline at once. Coming back to the tab would then sign the operator
+    // out with no warning at all, which reads as the site throwing them out
+    // rather than the site protecting them.
+    //
+    // A tab that was hidden is given the warning instead, on the reasoning
+    // that returning to the machine is itself the activity it should count
+    // as, and the sign-out still happens if they walk away again.
+    const onVisibility = () => {
+      if (document.hidden || warned.current) return;
+
+      const idleMs = Date.now() - lastActivity.current;
+      if (idleMs >= defaultIdleConfig.warnAfterMs) {
+        warned.current = true;
+        lastActivity.current = Date.now();
+        setRemaining(secondsRemaining(0));
+      }
+    };
+
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
   }, [signOut]);
 
   if (remaining === null && !signingOut) return null;
