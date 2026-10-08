@@ -57,8 +57,12 @@ class AuthController extends Controller
         $lockKey = 'login-lock:' . strtolower($request->email) . ':' . $request->ip();
         $attemptsKey = 'login-attempts:' . strtolower($request->email) . ':' . $request->ip();
 
-        if (Cache::has($lockKey)) {
-            $remaining = Cache::get($lockKey) - Carbon::now()->getTimestamp();
+        // One read, not two. Cache::has() followed by Cache::get() issued two
+        // queries before the password was even checked, and each round trip to
+        // TiDB costs a few hundred milliseconds on this instance.
+        $lockedUntil = Cache::get($lockKey);
+        if ($lockedUntil !== null) {
+            $remaining = $lockedUntil - Carbon::now()->getTimestamp();
             throw ValidationException::withMessages([
                 'email' => ["Too many failed attempts. Try again in " . max(1, (int) ceil($remaining / 60)) . " minute(s)."],
             ]);
@@ -75,6 +79,9 @@ class AuthController extends Controller
                 Cache::forget($attemptsKey);
             }
 
+            // Written inline, not deferred. Deferring it would save a round
+            // trip, but a lost entry in the audit trail is a worse trade than
+            // a few hundred milliseconds of sign-in time.
             AuditLog::create([
                 'user' => 'Unknown',
                 'ip_address' => $request->ip(),
@@ -87,9 +94,10 @@ class AuthController extends Controller
             ]);
         }
 
-        // Success resets the counter.
+        // Reset the counter. Only the attempts key can exist here: the lock
+        // key was just read as null, so forgetting it would be a second
+        // pointless round trip.
         Cache::forget($attemptsKey);
-        Cache::forget($lockKey);
 
         $token = $user->createToken('quickwash-token')->plainTextToken;
 
@@ -106,10 +114,6 @@ class AuthController extends Controller
             $user->forceFill(['password_hash' => Hash::make($request->password)])->save();
         }
 
-        // Stamped on every sign-in so the profile can show when the operator
-        // was last seen, instead of the placeholder the UI used to render.
-        $user->forceFill(['last_login_at' => Carbon::now()])->save();
-
         AuditLog::create([
             'user_id' => $user->id,
             'user' => $user->full_name,
@@ -117,6 +121,10 @@ class AuthController extends Controller
             'action' => 'LOGIN',
             'details' => "{$user->full_name} signed in successfully",
         ]);
+
+        // Stamped on every sign-in so the profile can show when the operator
+        // was last seen, instead of the placeholder the UI used to render.
+        $user->forceFill(['last_login_at' => Carbon::now()])->save();
 
         // Mirror the token into an HttpOnly cookie so the Next.js server-side
         // middleware (src/middleware.ts) can gate protected pages before they

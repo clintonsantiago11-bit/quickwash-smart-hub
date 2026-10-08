@@ -57,6 +57,8 @@ class VendingController extends Controller
             'standard_price' => $settings->standard_price,
             'premium_duration_min' => $settings->premium_duration_min,
             'premium_price' => $settings->premium_price,
+            'dry_duration_min' => $settings->dry_duration_min,
+            'dry_price' => $settings->dry_price,
             'coin_timeout_seconds' => $settings->coin_timeout_seconds,
         ])->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
     }
@@ -68,6 +70,8 @@ class VendingController extends Controller
             'standard_price' => 'required|numeric|min:1',
             'premium_duration_min' => 'required|integer|min:1|max:180',
             'premium_price' => 'required|numeric|min:1',
+            'dry_duration_min' => 'required|integer|min:1|max:180',
+            'dry_price' => 'required|numeric|min:1',
             'coin_timeout_seconds' => 'required|integer|min:1|max:120',
         ]);
 
@@ -81,7 +85,8 @@ class VendingController extends Controller
             'action' => 'VENDO_CONFIG',
             'details' => 'Updated the vending machine: Standard cycle ₱' . number_format($validated['standard_price'], 2)
                 . ' for ' . $validated['standard_duration_min'] . ' minutes, Premium cycle ₱' . number_format($validated['premium_price'], 2)
-                . ' for ' . $validated['premium_duration_min'] . ' minutes, coin collection window ' . $validated['coin_timeout_seconds'] . ' seconds',
+                . ' for ' . $validated['premium_duration_min'] . ' minutes, Dry cycle ₱' . number_format($validated['dry_price'], 2)
+                . ' for ' . $validated['dry_duration_min'] . ' minutes, coin collection window ' . $validated['coin_timeout_seconds'] . ' seconds',
         ]);
 
         return response()->json([

@@ -14,6 +14,8 @@ class VendoSetting extends Model
         'standard_price',
         'premium_duration_min',
         'premium_price',
+        'dry_duration_min',
+        'dry_price',
         'coin_timeout_seconds',
     ];
 
@@ -22,6 +24,8 @@ class VendoSetting extends Model
         'standard_price' => 'float',
         'premium_duration_min' => 'integer',
         'premium_price' => 'float',
+        'dry_duration_min' => 'integer',
+        'dry_price' => 'float',
         'coin_timeout_seconds' => 'integer',
     ];
 
@@ -32,6 +36,8 @@ class VendoSetting extends Model
             'standard_price' => 50.00,
             'premium_duration_min' => 15,
             'premium_price' => 100.00,
+            'dry_duration_min' => 8,
+            'dry_price' => 40.00,
             'coin_timeout_seconds' => 5,
         ]);
     }

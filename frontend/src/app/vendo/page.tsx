@@ -4,8 +4,9 @@ import Header from '@/components/Header';
 import NaekLiveCard from '@/components/NaekLiveCard';
 import NaekConfigCard from '@/components/NaekConfigCard';
 import { Coins, Clock, Save, Timer, RefreshCw, CheckCircle2 } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { api } from '@/lib/api';
+import { usePolling } from '@/lib/usePolling';
 
 interface VendoSettings {
   standard_duration_min: number;
@@ -58,32 +59,37 @@ export default function VendoConfigPage() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
+  // Set as soon as any field changes, and cleared on a successful save. The
+  // background poll stands down while it is true.
+  const dirtyRef = useRef(false);
+
+  const update = (patch: Partial<VendoSettings>) => {
+    dirtyRef.current = true;
+    setSettings((prev) => ({ ...prev, ...patch }));
+  };
+
+  const fetchSettings = async () => {
+    try {
+      const data = await api.getVendoSettings();
+      setSettings((prev) => {
+        // Never overwrite a field the operator is part-way through editing.
+        // This polled every five seconds, so a price being typed was replaced
+        // mid-keystroke and the change appeared to vanish.
+        if (dirtyRef.current) return prev;
+        return { ...prev, ...data };
+      });
+    } catch {
+      console.warn('Vendo settings unavailable');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchSettings = async () => {
-      try {
-        const data = await api.getVendoSettings();
-        setSettings((prev) => ({
-          ...prev,
-          ...data,
-          dry_duration_min: data.standard_duration_min ?? prev.dry_duration_min,
-          dry_price: data.standard_price ?? prev.dry_price,
-        }));
-      } catch {
-        console.warn('Vendo settings unavailable');
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchSettings();
-    const interval = setInterval(fetchSettings, 5000);
-    const onFocus = () => fetchSettings();
-    window.addEventListener('focus', onFocus);
-    return () => {
-      clearInterval(interval);
-      window.removeEventListener('focus', onFocus);
-    };
+    void fetchSettings();
   }, []);
+
+  usePolling(() => void fetchSettings(), { everyMs: 15000, jitterMs: 3000 });
 
   const handleSave = async () => {
     setSaving(true);
@@ -91,12 +97,17 @@ export default function VendoConfigPage() {
     setSaved(false);
     try {
       await api.updateVendoSettings({
-        standard_duration_min: parseInt(settings.standard_duration_min as unknown as string, 10),
-        standard_price: parseFloat(settings.standard_price as unknown as string),
-        premium_duration_min: parseInt(settings.premium_duration_min as unknown as string, 10),
-        premium_price: parseFloat(settings.premium_price as unknown as string),
-        coin_timeout_seconds: parseInt(settings.coin_timeout_seconds as unknown as string, 10),
+        standard_duration_min: parseInt(String(settings.standard_duration_min), 10),
+        standard_price: parseFloat(String(settings.standard_price)),
+        premium_duration_min: parseInt(String(settings.premium_duration_min), 10),
+        premium_price: parseFloat(String(settings.premium_price)),
+        // The dry cycle used to be copied from the standard cycle on load and
+        // never written back, so anything typed here vanished on the next poll.
+        dry_duration_min: parseInt(String(settings.dry_duration_min), 10),
+        dry_price: parseFloat(String(settings.dry_price)),
+        coin_timeout_seconds: parseInt(String(settings.coin_timeout_seconds), 10),
       });
+      dirtyRef.current = false;
       setSaved(true);
       setTimeout(() => setSaved(false), 4000);
     } catch (err) {
@@ -143,8 +154,8 @@ export default function VendoConfigPage() {
               <span className="badge badge-online text-[10px] px-2.5 py-1 uppercase tracking-wider">Active</span>
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <CycleField label="Duration" value={String(settings.standard_duration_min)} onChange={(v) => setSettings({ ...settings, standard_duration_min: Number(v) })} suffix="min" />
-              <CycleField label="Price" value={String(settings.standard_price)} onChange={(v) => setSettings({ ...settings, standard_price: Number(v) })} suffix="₱" accent />
+              <CycleField label="Duration" value={String(settings.standard_duration_min)} onChange={(v) => update({ standard_duration_min: Number(v) })} suffix="min" />
+              <CycleField label="Price" value={String(settings.standard_price)} onChange={(v) => update({ standard_price: Number(v) })} suffix="₱" accent />
             </div>
             <p className="mt-4 text-xs text-[var(--text-muted)] flex items-center gap-1.5">
               <Timer size={13} className="opacity-60" />
@@ -167,8 +178,8 @@ export default function VendoConfigPage() {
               <span className="badge badge-online text-[10px] px-2.5 py-1 uppercase tracking-wider">Active</span>
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <CycleField label="Duration" value={String(settings.premium_duration_min)} onChange={(v) => setSettings({ ...settings, premium_duration_min: Number(v) })} suffix="min" />
-              <CycleField label="Price" value={String(settings.premium_price)} onChange={(v) => setSettings({ ...settings, premium_price: Number(v) })} suffix="₱" accent />
+              <CycleField label="Duration" value={String(settings.premium_duration_min)} onChange={(v) => update({ premium_duration_min: Number(v) })} suffix="min" />
+              <CycleField label="Price" value={String(settings.premium_price)} onChange={(v) => update({ premium_price: Number(v) })} suffix="₱" accent />
             </div>
             <p className="mt-4 text-xs text-[var(--text-muted)] flex items-center gap-1.5">
               <Timer size={13} className="opacity-60" />
@@ -191,8 +202,8 @@ export default function VendoConfigPage() {
             <span className="badge badge-online text-[10px] px-2.5 py-1 uppercase tracking-wider">Active</span>
           </div>
           <div className="grid grid-cols-2 gap-4">
-            <CycleField label="Duration" value={String(settings.dry_duration_min)} onChange={(v) => setSettings({ ...settings, dry_duration_min: Number(v) })} suffix="min" />
-            <CycleField label="Price" value={String(settings.dry_price)} onChange={(v) => setSettings({ ...settings, dry_price: Number(v) })} suffix="₱" accent />
+            <CycleField label="Duration" value={String(settings.dry_duration_min)} onChange={(v) => update({ dry_duration_min: Number(v) })} suffix="min" />
+            <CycleField label="Price" value={String(settings.dry_price)} onChange={(v) => update({ dry_price: Number(v) })} suffix="₱" accent />
           </div>
           <p className="mt-4 text-xs text-[var(--text-muted)] flex items-center gap-1.5">
             <Timer size={13} className="opacity-60" />
@@ -217,7 +228,7 @@ export default function VendoConfigPage() {
             <CycleField
               label="Timeout per coin"
               value={String(settings.coin_timeout_seconds)}
-              onChange={(v) => setSettings({ ...settings, coin_timeout_seconds: Number(v) })}
+              onChange={(v) => update({ coin_timeout_seconds: Number(v) })}
               suffix="sec"
             />
           </div>

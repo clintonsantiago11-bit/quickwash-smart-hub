@@ -38,6 +38,8 @@ class AccessControlTest extends TestCase
                 'premium_price' => 150.00,
                 'standard_duration_min' => 5,
                 'premium_duration_min' => 8,
+                'dry_price' => 70.00,
+                'dry_duration_min' => 4,
                 'coin_timeout_seconds' => 30,
             ])
             ->assertStatus(403);
@@ -71,6 +73,8 @@ class AccessControlTest extends TestCase
                 'premium_price' => 150.00,
                 'standard_duration_min' => 5,
                 'premium_duration_min' => 8,
+                'dry_price' => 70.00,
+                'dry_duration_min' => 4,
                 'coin_timeout_seconds' => 30,
             ])
             ->assertStatus(200);
