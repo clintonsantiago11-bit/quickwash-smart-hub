@@ -133,7 +133,13 @@ class ApiClient {
   private async request(
     path: string,
     options: RequestInit = {},
-    opts: { skipAuthRedirect?: boolean; timeoutMs?: number } = {}
+    opts: {
+      skipAuthRedirect?: boolean;
+      timeoutMs?: number;
+      /** Send this token rather than the stored one. Used by sign-out, which
+       *  runs after the stored token has already been cleared. */
+      explicitToken?: string | null;
+    } = {}
   ) {
     // A FormData body must go out untouched, and Content-Type has to be left
     // alone so the browser can add the multipart boundary. Setting it by hand
@@ -144,8 +150,9 @@ class ApiClient {
     if (!isFormData) headers['Content-Type'] = 'application/json';
     Object.assign(headers, { ...(options.headers as Record<string, string> | undefined) });
 
-    if (this.token) {
-      headers['Authorization'] = `Bearer ${this.token}`;
+    const token = opts.explicitToken !== undefined ? opts.explicitToken : this.token;
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
     }
 
 
@@ -206,7 +213,11 @@ class ApiClient {
 
     if (!res.ok) {
       const errBody = body as { message?: string; error?: string } | null;
-      throw new Error(errBody?.message || errBody?.error || `Request failed (${res.status})`);
+      const message = errBody?.message || errBody?.error || `Request failed (${res.status})`;
+      // Carry the status so a caller can tell "you may not see this" (403)
+      // apart from "this is broken" (500). Without it the audit page could
+      // only guess, and showed a blank table to anyone who is not an admin.
+      throw Object.assign(new Error(message), { status: res.status });
     }
 
     return body;
@@ -272,8 +283,23 @@ class ApiClient {
     }
   }
 
+  /**
+   * Revokes the token on the server, then clears the browser session.
+   *
+   * The token is captured first and sent explicitly. Reading it from `this`
+   * instead is what made sign-out leave a live token behind: the idle timeout
+   * clears the token before calling this, so the request went out with no
+   * Authorization header, came back 401, and was swallowed — leaving the row
+   * valid for the whole eight hours.
+   */
   async logout() {
-    try { await this.post('/auth/logout'); } catch {}
+    const token = this.getToken();
+    try {
+      await this.request('/auth/logout', { method: 'POST' }, { explicitToken: token });
+    } catch {
+      // A failed revocation must still end the local session. The server-side
+      // row then expires on its own.
+    }
     this.setToken(null);
     clearAuthFlag();
     clearSessionCookie();

@@ -108,21 +108,22 @@ function IdleWatcher() {
     signingOutRef.current = true;
     setSigningOut(true);
 
-    // Clear the browser session first, before any network call.
-    //
-    // This used to await the server logout before clearing anything, and the
-    // dashboard answers that request in several seconds. The operator watched a
-    // dead "Signing you out" overlay for the whole time with no way out, and a
-    // slow response left them stuck. Nothing about leaving needs the server to
-    // agree first: the local token and cookie are what make the session.
+    // Start the revocation FIRST. logout() reads the token synchronously when
+    // it is called, so calling it before the token is cleared is what lets it
+    // send the Authorization header. Awaiting it before clearing is what made
+    // the overlay hang for the length of a slow request, so it is not awaited.
+    const revocation = api.logout().catch(() => undefined);
+
+    // Clear the browser session without waiting on that. The token and cookie
+    // are what make the session, so leaving does not need the server to agree
+    // first, and the operator lands on the sign-in page straight away instead
+    // of watching a dead overlay for several seconds.
     api.setToken(null);
     if (typeof document !== 'undefined') {
       document.cookie = 'qhs_session=; Max-Age=0; path=/';
     }
 
-    // Tell the server afterwards, without waiting on it. A failure only leaves
-    // the token row behind, which expires on its own.
-    void api.logout().catch(() => undefined);
+    void revocation;
 
     // reason=idle lets the sign-in page explain what happened and offer a way
     // back in, rather than the operator arriving at a bare form wondering why

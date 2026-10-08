@@ -12,6 +12,17 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
  */
 const WS_URL = process.env.NEXT_PUBLIC_WS_URL || null;
 
+/**
+ * Whether a live bridge is configured at all.
+ *
+ * This is deliberately distinct from "connected". With no bridge configured
+ * the badge read OFFLINE in red permanently, which looks like a broken site
+ * rather than a feature that was never enabled.
+ */
+export function isBridgeConfigured(): boolean {
+  return Boolean(WS_URL);
+}
+
 interface HardwareUpdatePayload {
   topic: string;
   data: Record<string, unknown>;

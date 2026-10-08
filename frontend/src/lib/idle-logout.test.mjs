@@ -6,6 +6,7 @@ const source = (p) => readFileSync(new URL(p, import.meta.url), 'utf8');
 const idle = source('../components/IdleLogout.tsx');
 const login = source('../app/login/page.tsx');
 const layout = source('../app/layout.tsx');
+const api = source('./api.ts');
 
 /**
  * The reported bug: after an idle sign-out the page went dead. The URL was
@@ -36,20 +37,32 @@ test('the overlay cannot be left stranded by a one-way latch', () => {
   );
 });
 
-test('the local session is cleared before the sign-out waits on the network', () => {
+test('the local session is cleared without waiting on the network', () => {
   const signOut = idle.slice(idle.indexOf('const signOut ='), idle.indexOf('const dismissWarning'));
 
+  const revoke = signOut.indexOf('api.logout()');
   const clearToken = signOut.indexOf('api.setToken(null)');
   const clearCookie = signOut.indexOf('qhs_session=; Max-Age=0');
-  const serverCall = signOut.indexOf('api.logout()');
   const navigate = signOut.indexOf('router.push(');
 
   assert.ok(clearToken > -1, 'the token must be cleared');
   assert.ok(clearCookie > -1, 'the session cookie must be cleared');
-  assert.ok(clearToken < serverCall, 'clear the token before telling the server');
-  assert.ok(clearCookie < serverCall, 'clear the cookie before telling the server');
-  assert.ok(serverCall < navigate, 'navigate without waiting on the server round trip');
-  assert.match(signOut, /void api\.logout\(\)/, 'the server call must not be awaited');
+
+  // logout() reads the token synchronously when it is called, so it has to be
+  // called before the token is cleared or the request goes out unauthorised
+  // and the server row is never revoked.
+  assert.ok(revoke < clearToken, 'the revocation must start before the token is cleared');
+  assert.ok(clearToken < navigate, 'the session is cleared before navigating');
+  assert.match(signOut, /\.catch\(\(\) => undefined\)/, 'the revocation must not be awaited');
+  assert.doesNotMatch(signOut, /await api\.logout\(\)/, 'awaiting it is what made the overlay hang');
+});
+
+test('sign-out actually sends the token so the server can revoke it', () => {
+  // The regression: reading the token from the client after it had been cleared
+  // meant a 401 that was swallowed, leaving the row valid for eight hours.
+  assert.match(api, /const token = this\.getToken\(\);/);
+  assert.match(api, /explicitToken: token/);
+  assert.match(api, /const token = opts\.explicitToken !== undefined \? opts\.explicitToken : this\.token;/);
 });
 
 test('the sign-in page explains an idle sign-out and offers a way to close it', () => {

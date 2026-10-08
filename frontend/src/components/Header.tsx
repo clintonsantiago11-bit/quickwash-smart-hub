@@ -6,7 +6,7 @@ import { useState, useEffect } from 'react';
 import { useUI } from '@/providers/UIProvider';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
-import { socketService } from '@/lib/socket';
+import { isBridgeConfigured, socketService } from '@/lib/socket';
 
 interface HeaderProps {
   title: string;
@@ -25,6 +25,8 @@ interface NotificationItem {
 
 export default function Header({ title, subtitle }: HeaderProps) {
   const [isConnected, setIsConnected] = useState(false);
+  // Read once: the bridge URL is baked in at build time and cannot change at runtime.
+  const bridgeConfigured = isBridgeConfigured();
   const [userInfo, setUserInfo] = useState<{ full_name: string; email: string } | null>(null);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -42,7 +44,11 @@ export default function Header({ title, subtitle }: HeaderProps) {
     api.getProfile().then((user) => {
       setUserInfo({ full_name: user.full_name, email: user.email });
     }).catch(() => {
-      setUserInfo({ full_name: 'Admin User', email: 'admin@quickwash.hub' });
+      // Never invent an identity. This used to fall back to "Admin User",
+      // so a 401, a timeout or flaky wifi made the account menu claim to be
+      // the administrator regardless of who was actually signed in. Showing
+      // nothing is honest; showing a lie is not.
+      setUserInfo(null);
     });
   }, []);
 
@@ -175,17 +181,37 @@ export default function Header({ title, subtitle }: HeaderProps) {
 
       {/* Right Section: Global Actions */}
       <div className="flex items-center justify-end gap-1 sm:gap-3 shrink-0">
-        {/* Connection Status Badge */}
+        {/* Connection status. Three states, not two: with no bridge configured
+            this read OFFLINE in red permanently, because nothing ever reports
+            a connection. The site was fine; the live feed simply was not set
+            up. A badge that always cries wolf is worse than none. */}
         <div
           className="hidden xl:flex items-center gap-2 px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider"
           style={{
-            background: isConnected ? 'var(--success-muted)' : 'var(--danger-muted)',
-            color: isConnected ? 'var(--success)' : 'var(--danger)',
+            background: bridgeConfigured
+              ? isConnected ? 'var(--success-muted)' : 'var(--danger-muted)'
+              : 'var(--bg-hover)',
+            color: bridgeConfigured
+              ? isConnected ? 'var(--success)' : 'var(--danger)'
+              : 'var(--text-muted)',
             fontFamily: 'var(--font-mono)',
           }}
+          title={
+            bridgeConfigured
+              ? isConnected
+                ? 'The IoT bridge is streaming live updates.'
+                : 'The IoT bridge is configured but not answering.'
+              : 'No IoT bridge is configured, so there is no live feed. The dashboard still refreshes on a timer.'
+          }
         >
-          <div className={`w-1.5 h-1.5 rounded-full animate-pulse ${isConnected ? 'bg-[var(--success)]' : 'bg-[var(--danger)]'}`} />
-          {isConnected ? 'MQTT Online' : 'Offline'}
+          <div
+            className={`w-1.5 h-1.5 rounded-full ${bridgeConfigured ? 'animate-pulse' : ''} ${
+              bridgeConfigured
+                ? isConnected ? 'bg-[var(--success)]' : 'bg-[var(--danger)]'
+                : 'bg-[var(--text-muted)]'
+            }`}
+          />
+          {bridgeConfigured ? (isConnected ? 'MQTT Online' : 'MQTT Offline') : 'No live bridge'}
         </div>
 
         {/* Search Trigger (Mobile) */}
@@ -295,8 +321,8 @@ export default function Header({ title, subtitle }: HeaderProps) {
           {activeDropdown === 'user' && (
             <div className="absolute right-0 top-12 w-56 rounded-xl shadow-2xl border overflow-hidden animate-slide-up z-50" style={{ background: 'var(--bg-elevated)', borderColor: 'var(--border)' }}>
               <div className="p-4 border-b bg-[var(--bg-base)]" style={{ borderColor: 'var(--border)' }}>
-                <p className="text-sm font-bold truncate">{userInfo?.full_name || 'Admin User'}</p>
-                <p className="text-xs text-[var(--text-muted)] truncate">{userInfo?.email || 'admin@quickwash.hub'}</p>
+          <p className="text-sm font-bold truncate">{userInfo?.full_name || 'Signed in'}</p>
+          <p className="text-xs text-[var(--text-muted)] truncate">{userInfo?.email || 'Session active'}</p>
               </div>
               <div className="p-2 space-y-1">
                 {/* Mobile-Only Options */}

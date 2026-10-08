@@ -103,6 +103,7 @@ export default function AuditLogPage() {
   const [format, setFormat] = useState<ExportFormat>('excel');
   const [exporting, setExporting] = useState(false);
   const [retention, setRetention] = useState<RetentionPreview | null>(null);
+  const [accessError, setAccessError] = useState('');
 
   const fetchLogs = async (action = filter, query = search, pageNum = page) => {
     setRefreshing(true);
@@ -115,8 +116,18 @@ export default function AuditLogPage() {
       setPage(data.pagination?.current_page ?? pageNum);
       setTotalPages(data.pagination?.total_pages ?? 1);
       setTotal(data.pagination?.total ?? 0);
-    } catch {
-      console.warn('Audit backend unavailable');
+      setAccessError('');
+    } catch (error) {
+      // The audit trail is administrator-only. Without this the page just
+      // showed an empty table and logged to the console, so anyone else who
+      // opened it was left staring at a blank screen.
+      const status = (error as { status?: number })?.status;
+      if (status === 403 || status === 401) {
+        setAccessError('The audit log is available to administrators only.');
+        setAuditLogs([]);
+      } else {
+        setAccessError('The audit log could not be loaded. Check the connection and try again.');
+      }
     } finally {
       setRefreshing(false);
     }
@@ -374,6 +385,22 @@ export default function AuditLogPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--border)]">
+                {accessError && (
+                  <tr>
+                    <td colSpan={4} className="px-4 py-12 text-center">
+                      <p className="text-sm font-bold text-[var(--text-primary)]">
+                        {accessError}
+                      </p>
+                    </td>
+                  </tr>
+                )}
+                {!accessError && auditLogs.length === 0 && !refreshing && (
+                  <tr>
+                    <td colSpan={4} className="px-4 py-12 text-center text-sm text-[var(--text-muted)]">
+                      No events recorded yet.
+                    </td>
+                  </tr>
+                )}
                 {auditLogs.map((log) => {
                   const meta = getMeta(log.action);
                   return (

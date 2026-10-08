@@ -100,11 +100,19 @@ export default function SettingsPage() {
                   </thead>
                   <tbody className="divide-y divide-[var(--border)]">
                     <tr className="hover:bg-[var(--bg-hover)] transition-colors">
-                      <td className="p-4 font-bold text-[var(--text-primary)]">{adminUser?.full_name ?? 'System Administrator'}</td>
-                      <td className="p-4 text-[var(--text-muted)] font-mono text-xs">{adminUser?.email ?? 'admin@quickwash.hub'}</td>
+                      {/* An em dash rather than a name. These fallbacks used to
+                          claim to be "System Administrator / admin@quickwash.hub",
+                          so any failure to load the real profile showed a
+                          confident identity that was not the signed-in one. */}
+                      <td className="p-4 font-bold text-[var(--text-primary)]">
+                        {adminUser?.full_name ?? '—'}
+                      </td>
+                      <td className="p-4 text-[var(--text-muted)] font-mono text-xs">
+                        {adminUser?.email ?? 'Could not be loaded'}
+                      </td>
                       <td className="p-4">
                         <span className="badge badge-online px-3 py-1 text-[10px] font-bold uppercase tracking-wider">
-                          {adminUser?.role ?? 'admin'}
+                          {adminUser?.role ?? 'unknown'}
                         </span>
                       </td>
                     </tr>
