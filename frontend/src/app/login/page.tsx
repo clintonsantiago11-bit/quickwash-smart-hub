@@ -71,7 +71,7 @@ export default function LoginPage() {
       let failure: LoginErrorKind = 'server';
 
       try {
-        auth = (await api.login(credentials.email, credentials.password)) as AuthResponse;
+        auth = (await api.login(credentials.email, credentials.password, credentials.keepSignedIn)) as AuthResponse;
       } catch (error) {
         failure = error instanceof LoginError ? error.kind : 'server';
       }
@@ -80,8 +80,16 @@ export default function LoginPage() {
       if (id !== attemptId.current) return;
 
       if (auth) {
-        if (credentials.rememberMe) localStorage.setItem('remembered_email', credentials.email.trim());
-        else localStorage.removeItem('remembered_email');
+        // Always remembered, whatever "keep me signed in" says. The email is
+        // the operator's own account, not a credential, and the checkbox now
+        // controls how long the session lives rather than whether it can be
+        // pre-filled. Un-ticking used to delete this, which meant the box was
+        // never off and never really off either.
+        try {
+          localStorage.setItem('remembered_email', credentials.email.trim());
+        } catch {
+          /* private browsing */
+        }
 
         // Read before writing, so the first sign-in from this browser is
         // greeted as a first visit rather than a return.

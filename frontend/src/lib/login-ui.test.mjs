@@ -14,7 +14,7 @@ const loginUi = () =>
 test('login uses plain product copy without fake coin-terminal language', () => {
   const form = source('../components/login/CredentialForm.tsx');
 
-  for (const copy of ['Email', 'Password', 'Remember email']) {
+  for (const copy of ['Email', 'Password', 'Keep me signed in']) {
     assert.match(form, new RegExp(`>\\s*${copy}\\s*<`), `expected form copy: ${copy}`);
   }
   assert.match(form, /Sign in/, 'expected the submit button copy: Sign in');
@@ -92,47 +92,42 @@ test('the greeting is decided by whether this browser has signed in before', () 
   assert.match(page, /remembered_email/);
 });
 
-test('the waiting state is a label, not an animation', () => {
+test('the waiting state is labelled and shows something is happening', () => {
   const page = source('../app/login/page.tsx');
   const form = source('../components/login/CredentialForm.tsx');
 
   assert.match(page, /setPhase\('verifying'\)/);
-  assert.match(form, /'Verifying…'/);
+  assert.match(form, /Verifying/);
 
-  // The progress bar was removed rather than frozen. It could only ever
-  // sweep, because nothing knows how far through the server's password
-  // hashing the request is, and a bar that cannot fill reads as stalled.
-  assert.doesNotMatch(form, /login-progress/, 'the progress bar is gone');
-
-  // The bar carried the announcement, so it is kept for screen readers.
+  // Signing in waits several seconds on a small instance, and a disabled
+  // button with static text reads as broken. There is a spinner and a running
+  // bar; both stop under reduced motion.
+  assert.match(form, /Loader2/);
+  assert.match(form, /className="animate-spin"/);
+  assert.match(form, /login-progress/);
   assert.match(form, /role="status"/);
   assert.match(form, /aria-live="polite"/);
-  assert.match(form, /sr-only/);
 });
 
-test('nothing on the sign-in screen animates', () => {
+test('only the two verifying indicators animate on the sign-in screen', () => {
   const form = source('../components/login/CredentialForm.tsx');
   const overlay = source('../components/login/WelcomeOverlay.tsx');
   const styles = source('../app/globals.css');
 
-  // No spinner in the button, nothing pulsing.
-  assert.doesNotMatch(`${form}\n${overlay}`, /animate-(spin|pulse|fade)/, 'the sign-in screen must not animate');
-  assert.doesNotMatch(form, /Loader2/, 'the spinner icon is gone');
+  // The greeting stays still and nothing else may pulse or spin.
+  assert.doesNotMatch(overlay, /animate-(spin|pulse|fade)/);
+  assert.doesNotMatch(form, /animate-pulse/);
 
-  // The login section of the stylesheet declares no animations of its own.
+  // The login stylesheet may declare the sweep for the bar, and nothing else.
   const loginStart = styles.indexOf('LOGIN');
-  const loginCss = styles.slice(loginStart);
+  const outsideReducedMotion = styles.slice(loginStart).split('prefers-reduced-motion')[0];
+  const keyframes = outsideReducedMotion.match(/@keyframes\s+[\w-]+/g) ?? [];
+  assert.deepEqual(keyframes, ['@keyframes login-progress-sweep']);
 
-  const keyframes = loginCss.match(/@keyframes\s+\S+/g) ?? [];
-  assert.deepEqual(keyframes, [], `the login stylesheet still defines keyframes: ${keyframes.join(', ')}`);
-
-  // Declarations inside the reduced-motion override are allowed, since that
-  // block exists to turn motion off.
-  const outsideReducedMotion = loginCss.split('prefers-reduced-motion')[0];
-  const animationDecls = outsideReducedMotion.match(/^\s+animation:/gm) ?? [];
-  assert.deepEqual(animationDecls, [], `animation declarations remain: ${animationDecls.length}`);
-
-  assert.doesNotMatch(styles, /login-progress-sweep|login-welcome-in/, 'the removed animations are still defined');
+  // And both are switched off when the operator asks for less motion.
+  const reduced = styles.slice(styles.indexOf('prefers-reduced-motion'));
+  assert.match(reduced, /\.login-progress-bar/);
+  assert.match(reduced, /\.animate-spin/);
 });
 
 test('a failed sign-in says why straight away, with no coin language', () => {

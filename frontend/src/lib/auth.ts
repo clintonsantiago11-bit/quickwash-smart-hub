@@ -9,7 +9,12 @@ export type Role = 'admin' | 'manager' | 'technician';
 export interface LoginCredentials {
   email: string;
   password: string;
-  rememberMe: boolean;
+  /**
+   * Whether the session should outlive the browser being closed. The token
+   * goes to sessionStorage when false, which is the safe default on a shared
+   * terminal. It does not affect the email, which is always remembered.
+   */
+  keepSignedIn: boolean;
 }
 
 /** Mirrors the Laravel `users` payload returned by /api/auth/login. */

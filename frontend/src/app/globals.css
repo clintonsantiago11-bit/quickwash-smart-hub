@@ -464,6 +464,29 @@ Sign-in welcome + verifying progress.
   outline-offset: 2px;
 }
 
+/* Verifying progress. Indeterminate on purpose: password hashing takes
+   seconds on a small instance and nothing on the wire says how far through
+   it the server is, so no percentage is invented. */
+.login-progress {
+  position: relative;
+  height: 3px;
+  overflow: hidden;
+  border-radius: 9999px;
+  background: var(--bg-input);
+}
+.login-progress-bar {
+  position: absolute;
+  inset-block: 0;
+  width: 38%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  animation: login-progress-sweep 1.15s ease-in-out infinite;
+}
+@keyframes login-progress-sweep {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(365%); }
+}
+
 /* Failure notice, in the form rather than over it. */
 .login-alert {
   display: flex;
@@ -512,8 +535,8 @@ Sign-in welcome + verifying progress.
   .login-context-copy { margin-top: 3.5rem; }
   .login-context h1 { font-size: 3.5rem; }
 }
-/* Reduced motion: nothing on the login screen moves anyway. Kept so the
-   page-level fade and any future transition stay switchable. */
+/* Reduced motion: no sweeping bar and no spinner. The label still changes to
+   "Verifying...", so the wait is still communicated without movement. */
 @media (prefers-reduced-motion: reduce) {
   .login-skip-link,
   .login-field,
@@ -521,5 +544,7 @@ Sign-in welcome + verifying progress.
   .login-eye,
   .login-checkbox,
   .login-btn,
-  .login-welcome { animation: none !important; transition: none !important; }
+  .login-welcome,
+  .login-progress-bar,
+  .animate-spin { animation: none !important; transition: none !important; }
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { Eye, EyeOff, LockKeyhole, Mail, ShieldAlert } from 'lucide-react';
+import { Eye, EyeOff, Loader2, LockKeyhole, Mail, ShieldAlert } from 'lucide-react';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { isBlockingPhase, type FieldError, type LoginCredentials, type LoginPhase } from '@/lib/auth';
 
@@ -23,7 +23,9 @@ export default function CredentialForm({
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(true);
+  // Off by default. On a shared terminal, staying signed in across a browser
+  // restart is a risk rather than a convenience, so it is the opt-in.
+  const [keepSignedIn, setKeepSignedIn] = useState(false);
   const isSubmitting = isBlockingPhase(phase);
   const [touched, setTouched] = useState<{ email: boolean; password: boolean }>({
     email: false,
@@ -59,7 +61,7 @@ export default function CredentialForm({
     if (isSubmitting) return;
 
     setTouched({ email: true, password: true });
-    const problem = onSubmit({ email, password, rememberMe });
+    const problem = onSubmit({ email, password, keepSignedIn });
     if (problem) {
       requestAnimationFrame(() => {
         (problem.field === 'email' ? emailRef : passwordRef).current?.focus();
@@ -150,12 +152,12 @@ export default function CredentialForm({
         <input
           type="checkbox"
           name="remember"
-          checked={rememberMe}
+          checked={keepSignedIn}
           disabled={isSubmitting}
-          onChange={(event) => setRememberMe(event.target.checked)}
+          onChange={(event) => setKeepSignedIn(event.target.checked)}
           className="login-checkbox"
         />
-        <span>Remember email</span>
+        <span>Keep me signed in</span>
       </label>
 
       {/* Nothing moves here. The progress bar that used to sit under the
@@ -165,7 +167,10 @@ export default function CredentialForm({
           The label change and the disabled button are the whole signal. */}
       <button type="submit" className="login-btn" disabled={isSubmitting}>
         {phase === 'verifying' ? (
-          'Verifying…'
+          <>
+            <Loader2 size={15} className="animate-spin" aria-hidden="true" />
+            Verifying…
+          </>
         ) : phase === 'success' ? (
           'Signed in'
         ) : phase === 'failed' ? (
@@ -175,11 +180,16 @@ export default function CredentialForm({
         )}
       </button>
 
-      {/* The bar also carried the announcement, so keep it for screen
-          readers. Visually hidden and static. */}
-      <p className="sr-only" role="status" aria-live="polite">
-        {phase === 'verifying' ? 'Verifying your credentials.' : ''}
-      </p>
+      {/* Password hashing on a small instance takes seconds, and nothing on
+          the wire says how far through it the server is. The bar therefore
+          runs rather than inventing a percentage, and it stops the button
+          looking frozen for the whole wait. */}
+      {phase === 'verifying' && (
+        <div className="login-progress" role="status" aria-live="polite">
+          <span className="login-progress-bar" aria-hidden="true" />
+          <span className="sr-only">Verifying your credentials…</span>
+        </div>
+      )}
     </form>
   );
 }

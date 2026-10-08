@@ -2,14 +2,13 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
 const DEFAULT_REQUEST_TIMEOUT_MS = 15_000;
 const LOGIN_REQUEST_TIMEOUT_MS = 75_000; // Render free instances can take 50s+ to wake.
 
-// Session marker cookie. The REAL auth is the Bearer token in localStorage;
-// this cookie only feeds the server-side UX gate (src/middleware.ts + the
-// camera proxy). It is set by the FRONTEND on its own origin, so it works no
-// matter where the Laravel API lives — unlike the API's HttpOnly cookie,
+// Session marker cookie. The REAL auth is the Bearer token in the browser's
+// storage; this cookie only feeds the server-side UX gate (src/middleware.ts +
+// the camera proxy). It is set by the FRONTEND on its own origin, so it works
+// no matter where the Laravel API lives — unlike the API's HttpOnly cookie,
 // which is host-scoped to the API and invisible to the dashboard's origin.
 const SESSION_COOKIE = 'qhs_session';
 const SESSION_COOKIE_TTL_SECONDS = 8 * 60 * 60; // mirrors SANCTUM_TOKEN_EXPIRATION
-const SESSION_COOKIE_ATTRS = `path=/; max-age=${SESSION_COOKIE_TTL_SECONDS}; SameSite=Lax`;
 
 /**
  * Fired when the API rejects the stored token. The root layout listens and
@@ -18,10 +17,16 @@ const SESSION_COOKIE_ATTRS = `path=/; max-age=${SESSION_COOKIE_TTL_SECONDS}; Sam
  */
 export const UNAUTHORIZED_EVENT = 'quickwash:unauthorized';
 
-function setSessionCookie() {
+/**
+ * The cookie is written with a lifetime only when the operator asked to stay
+ * signed in. Without it, it is a session cookie: closing the browser ends the
+ * session, which is the safe default for a shared terminal.
+ */
+function setSessionCookie(persistent: boolean) {
   if (typeof window === 'undefined') return;
   const secure = window.location.protocol === 'https:' ? '; Secure' : '';
-  document.cookie = `${SESSION_COOKIE}=1; ${SESSION_COOKIE_ATTRS}${secure}`;
+  const maxAge = persistent ? `; max-age=${SESSION_COOKIE_TTL_SECONDS}` : '';
+  document.cookie = `${SESSION_COOKIE}=1; path=/${maxAge}; SameSite=Lax${secure}`;
 }
 
 function clearSessionCookie() {
@@ -31,6 +36,41 @@ function clearSessionCookie() {
 
 /** Typed login failures for actionable form feedback. */
 export type LoginErrorKind = 'credentials' | 'network' | 'timeout' | 'server';
+
+const TOKEN_KEY = 'auth_token';
+const AUTH_FLAG_KEY = 'isAuthenticated';
+
+/** Reads the token from either store, preferring the persistent one. */
+function readStoredToken(): string | null {
+  try {
+    return (
+      window.localStorage.getItem(TOKEN_KEY) ?? window.sessionStorage.getItem(TOKEN_KEY) ?? null
+    );
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The signed-in marker follows the token, so a stale flag from a previous
+ * session cannot claim a session that has gone.
+ */
+function writeAuthFlag(persistent: boolean) {
+  try {
+    window.localStorage.setItem(AUTH_FLAG_KEY, persistent ? 'true' : 'false');
+  } catch {
+    /* private browsing */
+  }
+}
+
+function clearAuthFlag() {
+  try {
+    window.localStorage.removeItem(AUTH_FLAG_KEY);
+    window.sessionStorage.removeItem(AUTH_FLAG_KEY);
+  } catch {
+    /* private browsing */
+  }
+}
 
 export class LoginError extends Error {
   readonly kind: LoginErrorKind;
@@ -47,20 +87,46 @@ class ApiClient {
 
   constructor() {
     if (typeof window !== 'undefined') {
-      this.token = localStorage.getItem('auth_token');
+      this.token = readStoredToken();
     }
   }
 
-  setToken(token: string | null) {
+  /**
+   * `keepSignedIn` decides where the token lives.
+   *
+   * localStorage survives closing the browser, so it is opt-in. By default the
+   * token goes in sessionStorage, which the browser discards with the tab, so
+   * closing the terminal actually ends the session rather than leaving a live
+   * one for whoever opens it next.
+   *
+   * Both stores are always read, so a token written before this change, or by
+   * an older build, is still found and nobody is logged out by deploying.
+   */
+  setToken(token: string | null, keepSignedIn = true) {
     this.token = token;
-    if (token) {
-      localStorage.setItem('auth_token', token);
-    } else {
-      localStorage.removeItem('auth_token');
+    if (typeof window === 'undefined') return;
+
+    // Exactly one store holds the token, so switching the checkbox clears the
+    // other one rather than leaving a copy behind that outlives the choice.
+    const primary = keepSignedIn ? window.localStorage : window.sessionStorage;
+    const other = keepSignedIn ? window.sessionStorage : window.localStorage;
+
+    try {
+      if (token) {
+        primary.setItem(TOKEN_KEY, token);
+        other.removeItem(TOKEN_KEY);
+      } else {
+        primary.removeItem(TOKEN_KEY);
+        other.removeItem(TOKEN_KEY);
+      }
+    } catch {
+      // Private browsing can refuse storage; the in-memory token still works
+      // for this tab.
     }
   }
 
   getToken() {
+    if (!this.token && typeof window !== 'undefined') this.token = readStoredToken();
     return this.token;
   }
 
@@ -124,7 +190,7 @@ class ApiClient {
         throw new LoginError('credentials', errBody?.message || 'Invalid email or password.');
       }
       this.setToken(null);
-      localStorage.removeItem('isAuthenticated');
+      clearAuthFlag();
       clearSessionCookie();
 
       // Ask the shell to navigate, rather than assigning location.href.
@@ -178,16 +244,16 @@ class ApiClient {
   }
 
   // Auth
-  async login(email: string, password: string) {
+  async login(email: string, password: string, keepSignedIn = true) {
     try {
       const data = await this.post(
         '/auth/login',
         { email, password },
         { skipAuthRedirect: true, timeoutMs: LOGIN_REQUEST_TIMEOUT_MS }
       );
-      this.setToken(data.token);
-      localStorage.setItem('isAuthenticated', 'true');
-      setSessionCookie();
+      this.setToken(data.token, keepSignedIn);
+      writeAuthFlag(keepSignedIn);
+      setSessionCookie(keepSignedIn);
       return data;
     } catch (err) {
       if (err instanceof LoginError) throw err;
@@ -209,7 +275,7 @@ class ApiClient {
   async logout() {
     try { await this.post('/auth/logout'); } catch {}
     this.setToken(null);
-    localStorage.removeItem('isAuthenticated');
+    clearAuthFlag();
     clearSessionCookie();
   }
 
