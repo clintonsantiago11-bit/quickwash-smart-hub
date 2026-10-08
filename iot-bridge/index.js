@@ -195,6 +195,96 @@ app.get('/health', (req, res) => {
   res.json({ status: 'online', mqtt: mqttClient.connected ? 'connected' : 'disconnected' });
 });
 
+/* ---------------------------------------------------------------------------
+ * Camera relay.
+ *
+ * The ESP32-CAM lives on the wash-bay LAN, so neither Vercel nor Render can
+ * reach it: the deployed site's own proxy runs in the cloud and gets a
+ * connection refused. This process is already on the LAN, so it relays the
+ * stream and the dashboard points at the tunnel that exposes this agent.
+ *
+ * Without a tunnel from this machine to the internet the dashboard still
+ * cannot load a frame. /camera/status exists so the UI can say which of the
+ * two problems it is, rather than showing an empty box.
+ * ------------------------------------------------------------------------- */
+
+const CAMERA_HOST = (process.env.CAMERA_HOST || 'http://192.168.1.7').replace(/\/+$/, '');
+const CAMERA_STREAM_PATH = process.env.CAMERA_STREAM_PATH || '/stream';
+const CAMERA_TIMEOUT_MS = Number(process.env.CAMERA_TIMEOUT_MS || 6000);
+
+let cameraBusy = null;
+
+app.get('/camera/status', async (req, res) => {
+  const url = `${CAMERA_HOST}/`;
+  try {
+    const r = await fetch(url, { signal: AbortSignal.timeout(CAMERA_TIMEOUT_MS) });
+    res.json({
+      reachable: r.ok,
+      host: CAMERA_HOST,
+      // A relayed stream only reaches the browser if something exposes this
+      // agent publicly; the dashboard surfaces this so the cause is visible.
+      relayPath: '/camera/stream',
+      detail: r.ok ? 'The camera answered on the LAN.' : `The camera answered with HTTP ${r.status}.`,
+    });
+  } catch (error) {
+    res.status(502).json({
+      reachable: false,
+      host: CAMERA_HOST,
+      relayPath: '/camera/stream',
+      detail: `No answer from ${CAMERA_HOST}. Check the camera is powered and on this network.`,
+    });
+  }
+});
+
+app.get('/camera/stream', async (req, res) => {
+  // The ESP32-CAM serves one client at a time; a second connection is accepted
+  // and never produces frames, which looks like a frozen player.
+  if (cameraBusy) {
+    return res.status(503).json({ error: 'Camera stream already in use.' });
+  }
+
+  const ctrl = new AbortController();
+  const release = () => {
+    if (cameraBusy === ctrl) cameraBusy = null;
+  };
+  cameraBusy = ctrl;
+  req.on('close', () => {
+    ctrl.abort();
+    release();
+  });
+
+  try {
+    const upstream = await fetch(`${CAMERA_HOST}${CAMERA_STREAM_PATH}`, {
+      signal: ctrl.signal,
+      headers: { Connection: 'keep-alive' },
+    });
+
+    if (!upstream.ok || !upstream.body) {
+      release();
+      return res.status(502).json({ error: `Camera stream upstream error: ${upstream.status}` });
+    }
+
+    res.writeHead(200, {
+      'Content-Type': upstream.headers.get('content-type') || 'multipart/x-mixed-replace; boundary=frame',
+      'Cache-Control': 'no-store',
+      Connection: 'keep-alive',
+    });
+
+    const reader = upstream.body.getReader();
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done || ctrl.signal.aborted) break;
+      if (value && value.length) res.write(Buffer.from(value));
+    }
+    res.end();
+  } catch (error) {
+    res.writeHead(502, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Camera unreachable from this agent.' }));
+  } finally {
+    release();
+  }
+});
+
 // Profile Endpoints (protected by API key)
 app.get('/api/user/profile', requireApiKey, async (req, res) => {
   try {

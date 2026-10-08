@@ -122,14 +122,29 @@ export default function MjpegPlayer({
   }, [src]);
 
   return (
-    <div className="w-full h-full flex items-center justify-center">
+    <div className="w-full h-full flex flex-col items-center justify-center gap-2 p-4 text-center">
       {frameUrl ? (
         /* eslint-disable-next-line @next/next/no-img-element */
         <img src={frameUrl} alt={alt} className={className} />
       ) : (
-        <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-40" style={{ color: 'var(--text-muted)' }}>
-          {failed ? 'Stream unavailable — retrying…' : 'Connecting to stream…'}
-        </p>
+        <>
+          <p
+            className="text-[10px] font-black uppercase tracking-[0.2em] opacity-60"
+            style={{ color: 'var(--text-muted)' }}
+          >
+            {failed ? 'No video feed' : 'Connecting to stream…'}
+          </p>
+          {/* Say why, rather than leaving an empty box. A blank player reads
+              as a broken page; the camera is on the wash-bay LAN and neither
+              Vercel nor Render can reach it without a relay. */}
+          {failed && (
+            <p className="max-w-sm text-[11px] leading-relaxed opacity-60" style={{ color: 'var(--text-muted)' }}>
+              The camera is on the wash-bay network, which this site cannot reach directly.
+              Set <code className="font-mono">NEXT_PUBLIC_CAMERA_RELAY_URL</code> to the IoT
+              bridge exposed publicly so it can relay the stream.
+            </p>
+          )}
+        </>
       )}
     </div>
   );

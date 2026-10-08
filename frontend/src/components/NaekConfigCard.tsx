@@ -181,8 +181,36 @@ export default function NaekConfigCard() {
         </label>
       </div>
 
-      <div className="space-y-3">
-        {(products.length ? products : [{ name: 'WASH', rate: '10', duration: '30', pause: true }, { name: 'DRY', rate: '10', duration: '30', pause: true }, { name: 'FOAM', rate: '10', duration: '30', pause: true }]).map((p, i) => (
+      {/*
+        Only ever show what the device actually reported.
+
+        This used to render three placeholder products (WASH/DRY/FOAM at a
+        made-up price and duration) whenever the mirror was empty. That is
+        worse than an empty table: it looks like real configuration, It can be edited, and saving would push invented prices to the timer.
+      */}
+      {products.length === 0 ? (
+        <div
+          className="rounded-xl p-6 text-center"
+          style={{ background: 'var(--bg-base)', border: '1px dashed var(--border)' }}
+        >
+          <p className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
+            No timer configuration received yet
+          </p>
+          <p className="mx-auto mt-2 max-w-md text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+            The NAEK 3-in-1 timer has never reported from this site, so there is
+            nothing to show and nothing safe to edit. Its slots and prices are
+            read from the device, never assumed.
+          </p>
+          <p className="mx-auto mt-3 max-w-md text-[11px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+            On the carwash PC, set <code className="font-mono">NAEK_SINK=api</code> and{' '}
+            <code className="font-mono">NAEK_API_URL</code> to this site&rsquo;s API, then restart
+            the IoT bridge. Sales, credits and this configuration appear once it
+            reports.
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {products.map((p, i) => (
           <div key={i} className="rounded-xl p-4 grid grid-cols-2 sm:grid-cols-[1fr_1fr_1fr_auto] gap-3 items-end" style={{ background: 'var(--bg-base)', border: '1px solid var(--border)' }}>
             <label className="block">
               <span className="block text-[10px] font-mono uppercase tracking-wider text-[var(--text-muted)] mb-1.5">Product {i + 1} Name</span>
@@ -202,7 +230,8 @@ export default function NaekConfigCard() {
             </label>
           </div>
         ))}
-      </div>
+        </div>
+      )}
 
       <div className="mt-6 flex flex-col sm:flex-row sm:items-center justify-end gap-3">
         <div className="flex items-center gap-2 text-xs text-[var(--text-muted)] font-mono mr-auto">
@@ -211,7 +240,8 @@ export default function NaekConfigCard() {
         </div>
         <button
           onClick={handleSave}
-          disabled={saving}
+          // Nothing to push to the device when it has never reported.
+          disabled={saving || products.length === 0}
           className="h-11 px-6 rounded-xl font-bold text-sm flex items-center gap-2 transition-all hover:opacity-90 disabled:opacity-50"
           style={{ background: 'var(--accent)', color: 'var(--bg-base)', boxShadow: '0 8px 24px var(--accent-glow)' }}
         >

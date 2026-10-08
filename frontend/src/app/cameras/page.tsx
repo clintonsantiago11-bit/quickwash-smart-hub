@@ -25,8 +25,25 @@ interface HardwareUpdate {
 
 const CAMERA_CONTROL_URL = process.env.NEXT_PUBLIC_CAMERA_CONTROL_URL || 'http://192.168.1.7/';
 
+/**
+ * Where the MJPEG stream is fetched from.
+ *
+ * The camera sits on the wash-bay LAN, so the app's own /api/camera proxy
+ * runs in the cloud and gets refused. Two ways round that:
+ *
+ *  - NEXT_PUBLIC_CAMERA_RELAY_URL points at the IoT bridge exposed publicly
+ *    (Cloudflare Tunnel, ngrok, port forward). The bridge is on the LAN and
+ *    relays the stream. This is the one that works.
+ *  - Otherwise fall back to the in-app proxy, which is only reachable when
+ *    the frontend itself runs on the same LAN.
+ */
+const CAMERA_RELAY_URL = process.env.NEXT_PUBLIC_CAMERA_RELAY_URL || '';
+const STREAM_URL = CAMERA_RELAY_URL
+  ? `${CAMERA_RELAY_URL.replace(/\/+$/, '')}/camera/stream`
+  : '/api/camera/stream';
+
 const initialCameras: CameraFeed[] = [
-  { id: 'esp32_cam_1', name: 'Main Wash Bay', streamUrl: '/api/camera/stream', controlUrl: CAMERA_CONTROL_URL, status: 'offline' },
+  { id: 'esp32_cam_1', name: 'Main Wash Bay', streamUrl: STREAM_URL, controlUrl: CAMERA_CONTROL_URL, status: 'offline' },
 ];
 
 export default function CamerasPage() {
@@ -222,10 +239,18 @@ export default function CamerasPage() {
                     <div className="min-w-0">
                       <p className="text-xs lg:text-sm font-black text-[var(--warning)] uppercase tracking-widest">Network Alert</p>
                       <p className="text-[10px] lg:text-xs mt-1 leading-relaxed font-bold opacity-60" style={{ color: 'var(--text-secondary)' }}>
-                        Surveillance node unreachable. Check the ESP32-CAM power supply (solid 5V/2A), reseat the camera ribbon cable, or open its control panel to verify the sensor.
+                        {/* Not a hardware fault by default. The camera sits on
+                            the wash-bay LAN and this site runs in the cloud,
+                            which cannot route to a LAN address at all. The old
+                            copy suggested checking the power supply and the
+                            ribbon cable, which sends an operator looking for
+                            a fault that is not there. */}
+                        {CAMERA_RELAY_URL
+                          ? 'The camera did not answer through the IoT bridge. Check the bridge is running on the wash-bay PC and that the camera is powered.'
+                          : 'This site cannot reach the camera. It sits on the wash-bay network, which the deployed site has no route to. Set NEXT_PUBLIC_CAMERA_RELAY_URL to the IoT bridge exposed publicly, and it will relay the video.'}
                       </p>
                       <p className="text-[10px] lg:text-xs mt-2 leading-relaxed font-bold opacity-40" style={{ color: 'var(--text-secondary)' }}>
-                        Target device: {CAMERA_CONTROL_URL} (auto-retrying every 10s)
+                        Camera on the bay network: {CAMERA_CONTROL_URL} (auto-retrying every 10s)
                       </p>
                     </div>
                   </div>
