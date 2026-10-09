@@ -21,7 +21,13 @@
     </source>
     <php>
         <env name="APP_ENV" value="testing"/>
-        <env name="APP_KEY" value="base64:BcJP41ICR33+NRvhq5ytKjvhN/F0V4XwHffFRDC+NDM="/>
+        <!-- Throwaway key. This file is committed, so whatever value sits here
+             is public in the repository. It must never match backend/.env or any
+             deployed APP_KEY; the test suite only needs a well-formed 32-byte
+             key to satisfy the encrypter, so a dedicated value is the only safe
+             option here. Generate with:
+               php -r "echo 'base64:'.base64_encode(random_bytes(32));" -->
+        <env name="APP_KEY" value="base64:qF6pDQdbmWOYNyTX0xHcqOokSxyyiVlpvdMMy7EpD68="/>
         <env name="BCRYPT_ROUNDS" value="4"/>
         <env name="CACHE_DRIVER" value="array"/>
         <env name="SESSION_DRIVER" value="array"/>

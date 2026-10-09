@@ -1,0 +1,92 @@
+# ==================================================================
+# QuickWash Smart Hub — Render blueprint (Laravel API)
+#
+# DOCUMENTATION, NOT AUTOMATION.
+#
+# This file records the settings the Render web service needs so they are not
+# tribal knowledge. It deliberately holds no secret values.
+#
+# Do NOT click "Apply Blueprint" against an existing service: Render treats
+# the file as the desired state and will reconcile your live service to it,
+# which can reset settings that are not listed here. Edit the service in the
+# dashboard, then keep this file in step by hand.
+#
+# Validated with:  render blueprints validate
+# ==================================================================
+
+services:
+  - type: web
+    name: quickwash-api
+    runtime: docker
+
+    # The backend is its own build context. backend/Dockerfile copies the
+    # whole context and expects composer.json/composer.lock at its root.
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+
+    # Render injects $PORT; docker/entrypoint.sh rebinds Apache to it.
+    # Default Render port is 10000, not 8000 — nothing to set here.
+    plan: free
+
+    # Render probes this to decide the deploy is live.
+    healthCheckPath: /api/health
+
+    # Push to master rebuilds. Required: backend/docker/entrypoint.sh runs
+    # migrate + seed on boot, so a deploy is how schema changes ship.
+    autoDeploy: true
+
+    envVars:
+      # --- Structural values, safe to commit ---
+      - key: APP_ENV
+        value: production
+      - key: APP_DEBUG
+        value: "false"
+      - key: DB_CONNECTION
+        value: mysql
+      - key: DB_PORT
+        value: "4000" # TiDB Cloud Starter/Essential, not 3306
+      - key: DB_SSL_CA
+        value: /etc/ssl/certs/ca-certificates.crt
+      - key: DB_PERSISTENT
+        value: "false"
+      # The sign-in lockout and every route throttle live in the cache. A file
+      # store on Render's ephemeral disk resets on each deploy and spin-down.
+      - key: CACHE_DRIVER
+        value: database
+      - key: SESSION_DRIVER
+        value: file
+      - key: QUEUE_CONNECTION
+        value: sync
+      - key: BROADCAST_DRIVER
+        value: log
+      - key: TRUSTED_PROXIES
+        value: "*"
+      - key: SANCTUM_TOKEN_EXPIRATION
+        value: "480"
+      - key: ALLOW_VERCEL_PREVIEWS
+        value: "true"
+
+      # --- Values YOU supply. sync: false means Render prompts for them at
+      #     apply time and never writes them into the repo. ---
+      - key: APP_URL # https://<this-service>.onrender.com
+        sync: false
+      - key: APP_KEY # php -r "echo 'base64:'.base64_encode(random_bytes(32));"
+        sync: false
+      - key: FRONTEND_URL # the Vercel origin, no trailing slash
+        sync: false
+      - key: FRONTEND_URLS
+        sync: false
+      - key: DB_HOST # <region>.prod.aws.tidbcloud.com
+        sync: false
+      - key: DB_DATABASE
+        sync: false
+      - key: DB_USERNAME
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: NAEK_INGEST_KEY # openssl rand -hex 24
+        sync: false
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD # remove after the first sign-in
+        sync: false
