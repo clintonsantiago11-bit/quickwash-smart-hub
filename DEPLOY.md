@@ -150,6 +150,28 @@ cards, expose the bridge either by running it as another Railway service
 bridge: `cloudflared tunnel --url http://localhost:3001` and set
 `NEXT_PUBLIC_WS_URL` to that URL.
 
+### Low-supply thresholds
+
+The alert levels for water, soap and wax are **not** environment variables.
+They live in the database (`system_settings`, row id=1) and are edited at
+`/settings` in the dashboard, which writes them through
+`PUT /api/settings` behind `role:admin,manager` with server-side bounds and an
+audit-trail entry.
+
+The bridge loads them once at start and re-reads every 60 seconds, so a change
+takes effect **without a restart**. If the table has no row, or the query fails,
+it falls back to 20% water / 15% soap / 15% wax and says so in its log rather
+than stopping sensor logging.
+
+A reading at or below the threshold raises an alert naming both the level and
+the threshold that produced it. Recovery is automatic: when the tank comes back
+above the threshold the alert is resolved, mirroring how `JAM_ERROR` already
+self-heals. `createAlert` dedupes on (device, type), so a tank that stays low for
+a week produces one alert rather than one per reading.
+
+A tank that reports *nothing* is never treated as recovered — otherwise a
+sensor dropping off would clear its own fault.
+
 ---
 
 ## Reaching the camera from the cloud

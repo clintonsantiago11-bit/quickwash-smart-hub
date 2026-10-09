@@ -15,6 +15,7 @@ const mqtt = require('mqtt');
 const cors = require('cors');
 require('dotenv').config();
 const db = require('./db');
+const thresholdStore = require('./thresholds-store');
 
 // Configuration
 const PORT = process.env.PORT || 3001;
@@ -112,12 +113,24 @@ mqttClient.on('message', async (topic, message) => {
     if (category === 'sensor' || category === 'vending') {
       if (detail === 'levels') {
         await db.ensureDevice(deviceId, 'controller');
-        await db.logSensorData(deviceId, {
+        const levels = {
           water: data.water,
           soap_a: data.soap_a,
           soap_b: data.soap_b,
           wax: data.wax
-        });
+        };
+        await db.logSensorData(deviceId, levels);
+
+        // Compare against the configured low-supply thresholds. This is what
+        // makes the settings screen's percentage fields do anything; the
+        // levels used to be logged and nothing more.
+        const { raised, resolved } = await thresholdStore.checkThresholds(deviceId, levels);
+        for (const alert of raised) {
+          console.log(`\u26A0 ${deviceId}: ${alert.message} (${alert.severity})`);
+        }
+        for (const type of resolved) {
+          console.log(`\u2713 ${deviceId}: ${type} cleared, level recovered`);
+        }
       } else if (detail === 'flow_temp') {
         await db.ensureDevice(deviceId, 'controller');
         await db.logSensorData(deviceId, {
@@ -309,6 +322,19 @@ app.post('/api/user/profile', requireApiKey, async (req, res) => {
 server.listen(PORT, () => {
   console.log(`🚀 IoT Bridge running on http://localhost:${PORT}`);
 });
+
+// Load the low-supply thresholds once at start, then keep them fresh. Loading
+// before MQTT messages start arriving matters: the very first levels message
+// should be compared against the configured values rather than the built-in
+// defaults, otherwise a bridge started right after a dashboard change would
+// use the wrong thresholds until the next refresh.
+thresholdStore.loadThresholds().then((t) => {
+  console.log(
+    `\u{1F6E0} Low-supply thresholds: water ${t.low_water_pct}% · ` +
+      `soap ${t.low_soap_pct}% · wax ${t.low_wax_pct}%`
+  );
+});
+thresholdStore.startThresholdRefresh();
 
 // NAEK edge agent: polls the stock NAEK carwash timer page and syncs it
 // (config via NAEK_* env vars; set NAEK_ENABLED=false to disable)

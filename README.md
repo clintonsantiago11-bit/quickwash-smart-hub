@@ -19,6 +19,8 @@ hardware to the internet.
 - **frontend/** — Next.js 16 dashboard (App Router, Tailwind v4, Socket.IO live cards).
 - **iot-bridge/** — Node edge agent on the carwash PC: polls the NAEK device and
   writes either to local MySQL (`NAEK_SINK=db`) or to the cloud API (`NAEK_SINK=api`).
+  Also compares tank levels against the low-supply thresholds in
+  `system_settings` (edited at `/settings`) and raises/clears the alerts.
 - **firmware/** — Arduino sketches for the ESP32 controller, camera and vending node.
 - **backups/** — local `mysqldump` output (gitignored); see `BACKUP_DB.bat`.
 
@@ -27,7 +29,7 @@ hardware to the internet.
 1. Start XAMPP (Apache + MySQL) and make sure the `quickwash_hub` database is imported.
 2. API: `cd backend && php artisan serve` (http://localhost:8000, health at `/api/health`).
 3. Dashboard: `cd frontend && npm run dev` (http://localhost:3000).
-4. Edge agent: `cd iot-bridge && cp .env.example .env && node index.js`.
+4. Edge agent: `cd iot-bridge && cp .env.example .env && npm test && node index.js`.
 5. Sign in with the seeded admin account (`ADMIN_EMAIL` / `ADMIN_PASSWORD` in
    `backend/.env`; if unset, the seeder prints a generated password once).
 
