@@ -65,6 +65,10 @@ services:
         value: "480"
       - key: ALLOW_VERCEL_PREVIEWS
         value: "true"
+      # Your Vercel PROJECT slug, used to build the preview-origin pattern.
+      # Unset = preview origins refused (the safe default).
+      - key: VERCEL_PROJECT_SLUG
+        sync: false
 
       # --- Values YOU supply. sync: false means Render prompts for them at
       #     apply time and never writes them into the repo. ---

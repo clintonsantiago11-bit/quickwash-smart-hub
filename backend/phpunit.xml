@@ -32,6 +32,11 @@
         <env name="CACHE_DRIVER" value="array"/>
         <env name="SESSION_DRIVER" value="array"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
+        <!-- The Vercel preview-origin pattern in config/cors.php is built from
+             this slug, so the CORS suite sets it to exercise the real pattern
+             rather than the unset-slug fallback (which refuses previews). -->
+        <env name="VERCEL_PROJECT_SLUG" value="quickwash-smart"/>
+        <env name="FRONTEND_URL" value="https://quickwash-smart-hub.vercel.app"/>
         <!-- Tests run against a dedicated DB so the live demo data is untouched -->
         <env name="DB_CONNECTION" value="mysql"/>
         <env name="DB_HOST" value="127.0.0.1"/>

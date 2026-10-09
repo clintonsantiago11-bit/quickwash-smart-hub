@@ -1,5 +1,15 @@
 export const dynamic = 'force-dynamic';
 
+import { verify, readCookie } from '@/lib/camera-session';
+
+// Vercel terminates a function after maxDuration, and that cap counts time
+// spent streaming a response. 300s is the Hobby ceiling (there is no higher
+// value available on that plan), so an MJPEG stream is severed every five
+// minutes. The player treats that as "stream ended" and reconnects; see
+// MjpegPlayer's maxRetries. Stating it here so the next reader does not go
+// looking for a bug that is really the platform's limit.
+export const maxDuration = 300;
+
 // Proxies the ESP32-CAM MJPEG stream so the browser only ever talks to
 // the app's own origin. This avoids CORS / Brave Shields / Private Network
 // Access restrictions when embedding http://<camera-ip>:81/stream directly.
@@ -37,10 +47,12 @@ const reaper = setInterval(() => {
 if (typeof reaper.unref === 'function') reaper.unref();
 
 export async function GET(request: Request) {
-  // Server-side auth gate (see panel route): the camera feed is private.
-  const cookies = request.headers.get('cookie') ?? '';
-  const hasAuth = /(?:^|;\s*)qhs_session=[^;]+/.test(cookies);
-  if (!hasAuth) {
+  // The live camera feed is private. The gate is a server-signed session
+  // cookie, not a name check: the ESP32-CAM authenticates nothing, so this
+  // proxy is the whole boundary once CAMERA_STREAM_URL is reachable from
+  // outside the LAN.
+  const session = verify(readCookie(request, 'qhs_session'));
+  if (!session) {
     return new Response('Unauthorized', { status: 401 });
   }
 

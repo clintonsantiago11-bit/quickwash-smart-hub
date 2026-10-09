@@ -42,9 +42,45 @@ test('the token only survives a browser restart when that box is ticked', () => 
   assert.match(api, /primary\.setItem\(TOKEN_KEY, token\);\s*\n\s*other\.removeItem\(TOKEN_KEY\);/);
 });
 
-test('the session cookie only gets a lifetime when staying signed in', () => {
-  assert.match(api, /const maxAge = persistent \? `; max-age=\$\{SESSION_COOKIE_TTL_SECONDS\}` : '';/);
-  assert.match(api, /setSessionCookie\(keepSignedIn\)/);
+/**
+ * The session cookie is minted server-side now, so these assertions check that
+ * the browser no longer owns it and that "keep me signed in" still reaches the
+ * server that does.
+ *
+ * The cookie used to be written from JavaScript as `qhs_session=1`, which the
+ * camera proxy accepted on the strength of the cookie existing at all. That is
+ * why the lifetime logic lived here. The value is signed and HttpOnly now, so
+ * the browser cannot write it or read it - and consequently cannot delete it
+ * either, which is what DELETE /api/session exists for.
+ */
+test('the session cookie is minted server-side, not written from the browser', () => {
+  const route = source('../app/api/session/route.ts');
+
+  // No client-side cookie writing at all for this cookie.
+  assert.doesNotMatch(api, /document\.cookie\s*=\s*`\$\{SESSION_COOKIE\}/);
+  assert.doesNotMatch(api, /function setSessionCookie/);
+
+  // It is minted by a route that asks Laravel to vouch for the bearer token,
+  // and it is HttpOnly so it cannot be forged or cleared from the browser.
+  assert.match(route, /fetch\(`\$\{API_BASE\}\/auth\/user`/);
+  assert.match(route, /httpOnly: true/);
+  assert.match(api, /void syncSessionCookie\(data\.token, keepSignedIn\)/);
+});
+
+test('the checkbox still governs how long the cookie lives', () => {
+  const route = source('../app/api/session/route.ts');
+
+  // The server is told the choice rather than assuming a persistent cookie.
+  assert.match(route, /persistent = body\.persistent/);
+  assert.match(route, /\.\.\.\(persistent \? \{ maxAge: minutes \* 60 \} : \{\}\)/);
+
+  // And clearing it is a server round trip, because HttpOnly means
+  // document.cookie cannot expire it.
+  assert.match(api, /void revokeSessionCookie\(\)/);
+  assert.match(api, /await revokeSessionCookie\(\)/);
+});
+
+test('login keeps its signature', () => {
   assert.match(api, /async login\(email: string, password: string, keepSignedIn = true\)/);
 });
 

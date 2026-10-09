@@ -152,6 +152,68 @@ bridge: `cloudflared tunnel --url http://localhost:3001` and set
 
 ---
 
+## Reaching the camera from the cloud
+
+The ESP32-CAM is the one piece of hardware with **no authentication of its
+own**. `app_httpd.cpp` registers every route as `HTTP_GET` and defines no auth
+handler, so anything that can reach port 81 can watch the stream and anything
+that can reach port 80 can reconfigure the sensor — including `/reg`, which
+writes sensor registers directly.
+
+The default is therefore that the camera is **not** reachable from the cloud:
+`CAMERA_HOST` / `CAMERA_STREAM_URL` point at a LAN address that Vercel and
+Render have no route to, and the dashboard shows the camera as offline. That
+is correct behaviour, not a bug.
+
+### If you do expose it
+
+1. **Pin a static IP.** The stock sketch takes a DHCP lease (`WiFi.localIP()`
+   is only ever printed), so `192.168.1.7` is a guess. If the lease moves, the
+   proxy either 504s or — worse — talks to whatever device later claims `.7`.
+   Either reserve the address in your router, or add this before
+   `startCameraServer()`:
+
+   ```cpp
+   // After WiFi.begin() succeeds, before startCameraServer().
+   IPAddress local(192, 168, 1, 7);
+   IPAddress gateway(192, 168, 1, 1);
+   IPAddress subnet(255, 255, 255, 0);
+   IPAddress dns(8, 8, 8, 8);
+   WiFi.config(local, gateway, subnet, dns);
+   ```
+
+   Pick an address outside your router's DHCP pool, or the lease will fight
+   the static one.
+
+2. **Set a real secret on the frontend.** `CAMERA_SESSION_SECRET` is what the
+   camera proxy trusts. Without it the proxy refuses everything — fail closed,
+   on purpose.
+
+   ```
+   node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+   ```
+
+3. **Choose a transport.** A Cloudflare Tunnel from the carwash PC is the
+   easiest — no router changes, and it can be revoked by deleting the tunnel.
+   Port-forwarding port 81 straight through exposes the camera's own web UI
+   with **no authentication at all**, which is materially worse than going
+   through the app.
+
+4. **Leave `CAMERA_PANEL_ALLOW_WRITE` off** unless you need the exposure and
+   resolution controls. Watching the bay does not require them. `/reg`,
+   `/greg`, `/xclk` and `/pll` are never proxied regardless of that setting.
+
+### A limit worth knowing
+
+Vercel terminates a function at `maxDuration`, and that cap **includes time
+spent streaming a response**. On the Hobby plan 300s is both the default and
+the maximum, so a continuous MJPEG feed is severed every five minutes and the
+player reconnects. That is a platform limit, not a fault — `MjpegPlayer`
+retries 20 times, which is about a hundred minutes of viewing before it gives
+up. On Pro the cap rises to 800s.
+
+---
+
 ## Local demo (unchanged, ₱0)
 
 1. Start XAMPP (Apache + MySQL), `quickwash_hub` imported
@@ -162,6 +224,11 @@ bridge: `cloudflared tunnel --url http://localhost:3001` and set
 ## Production security checklist
 
 - [x] Frontend `qhs_session` auth gate (works cross-origin; Bearer is the real auth)
+- [x] Camera proxy gated on a server-signed HttpOnly cookie, not a cookie-name
+      check — the ESP32-CAM authenticates nothing, so the proxy is the boundary
+- [x] Camera panel proxy is read-only by default; `/reg`, `/greg`, `/xclk` and
+      `/pll` are never forwarded
+- [x] Vercel preview CORS pattern scoped to your project slug, not `*.vercel.app`
 - [x] No default admin credential ships — the seeder takes `ADMIN_PASSWORD` or
       generates a random one and prints it once
 - [x] Node runtime pinned for the dashboard build (`frontend/.nvmrc` + `engines`)

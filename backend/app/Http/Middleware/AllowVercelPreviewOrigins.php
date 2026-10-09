@@ -7,9 +7,9 @@ use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * Allows Vercel preview deployments to call this API.
+ * Allows this project's Vercel preview deployments to call this API.
  *
- * Each push mints a new hashed origin (project-<hash>-<branch>.vercel.app),
+ * Each push mints a new hashed origin (quickwash-<hash>-<branch>.vercel.app),
  * so previews cannot be listed in config/cors.php ahead of time. They are
  * matched here by pattern instead.
  *
@@ -21,23 +21,51 @@ use Symfony\Component\HttpFoundation\Response;
  * keeps it verifiable rather than a line of configuration that looks right and
  * does nothing.
  *
- * Safe only because supports_credentials is false in config/cors.php. The
- * dashboard authenticates with a bearer token from localStorage, which a
- * foreign origin cannot read, so allowing an origin lets it reach the API but
- * never with a session. Do not turn credentials back on without removing this.
+ * The pattern is read from config('cors.allowed_origin_patterns') rather than
+ * repeated here, so there is one place that decides which Vercel origins are
+ * welcome. It used to be duplicated, and the copy in this file matched ANY
+ * *.vercel.app - every project on Vercel, not this one. Deriving it from the
+ * configured FRONTEND_URL narrows it to this project and its previews.
+ *
+ * On safety, and correcting the note that used to live here: this middleware
+ * sets Access-Control-Allow-Credentials: true, matching config/cors.php,
+ * which does enable credentials. That is not what makes it safe. Credentials
+ * are set because the dashboard fetches with credentials:'include' and the
+ * browser discards a credentialed response that lacks the header. What makes
+ * it safe is that this API does not authenticate with a cookie the browser
+ * attaches automatically - every request carries an Authorization: Bearer
+ * header built from a token in the dashboard's localStorage, which a foreign
+ * origin cannot read - and the only cookie it does set, auth_token, is
+ * SameSite=Lax, so a cross-site request never returns it. A hostile origin can
+ * therefore reach this API but has no session to present and gets 401.
+ *
+ * Do not turn that around by enabling Sanctum's stateful cookie auth
+ * (SANCTUM_STATEFUL_DOMAINS) while this pattern is in place.
  */
 class AllowVercelPreviewOrigins
 {
-    /** Anchored so only a genuine vercel.app host matches. */
-    private const PATTERN = '#^https://[a-z0-9][a-z0-9-]*(\.[a-z0-9][a-z0-9-]*)*\.vercel\.app$#i';
-
     public function handle(Request $request, Closure $next): Response
     {
         $response = $next($request);
 
         $origin = (string) $request->headers->get('Origin');
 
-        if ($origin === '' || preg_match(self::PATTERN, $origin) !== 1) {
+        if ($origin === '') {
+            return $response;
+        }
+
+        $patterns = (array) config('cors.allowed_origin_patterns', []);
+        $matched = false;
+        foreach ($patterns as $pattern) {
+            // fruitcake/php-cors applies these with preg_match, so they are real
+            // regular expressions rather than globs.
+            if (@preg_match((string) $pattern, $origin) === 1) {
+                $matched = true;
+                break;
+            }
+        }
+
+        if (! $matched) {
             return $response;
         }
 

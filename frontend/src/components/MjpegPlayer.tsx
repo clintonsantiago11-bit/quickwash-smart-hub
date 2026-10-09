@@ -8,6 +8,16 @@ type MjpegPlayerProps = {
   className?: string;
   onConnected?: () => void;
   onFailed?: () => void;
+  /**
+   * How many times to reconnect after the stream drops.
+   *
+   * This is not a network-fluctuation allowance. Vercel terminates a function
+   * at maxDuration and that cap includes streamed responses, so a continuous
+   * MJPEG feed is severed every 300 seconds on the Hobby plan - there is no
+   * higher value available there to configure. Each reconnect buys another
+   * five minutes, so the old default of 3 gave up after roughly twenty
+   * minutes of watching a camera that was working perfectly.
+   */
   maxRetries?: number;
 };
 
@@ -38,7 +48,7 @@ export default function MjpegPlayer({
   className,
   onConnected,
   onFailed,
-  maxRetries = 3,
+  maxRetries = 20,
 }: MjpegPlayerProps) {
   const [frameUrl, setFrameUrl] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);

@@ -2,13 +2,20 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
 const DEFAULT_REQUEST_TIMEOUT_MS = 15_000;
 const LOGIN_REQUEST_TIMEOUT_MS = 75_000; // Render free instances can take 50s+ to wake.
 
-// Session marker cookie. The REAL auth is the Bearer token in the browser's
-// storage; this cookie only feeds the server-side UX gate (src/middleware.ts +
-// the camera proxy). It is set by the FRONTEND on its own origin, so it works
-// no matter where the Laravel API lives — unlike the API's HttpOnly cookie,
-// which is host-scoped to the API and invisible to the dashboard's origin.
-const SESSION_COOKIE = 'qhs_session';
-const SESSION_COOKIE_TTL_SECONDS = 8 * 60 * 60; // mirrors SANCTUM_TOKEN_EXPIRATION
+/**
+ * Session cookie for the camera proxy.
+ *
+ * The REAL auth is the Sanctum Bearer token above. This cookie exists only
+ * because two camera consumers cannot send an Authorization header - an
+ * <iframe> navigation carries cookies but no custom headers, and the ESP32-CAM
+ * has no authentication of its own, so the proxy has to be the boundary.
+ *
+ * It is minted by POST /api/session, which asks Laravel to vouch for the
+ * bearer token first, and it is HttpOnly + signed server-side. That means the
+ * browser can neither read nor forge it - and equally, it cannot clear it.
+ * Clearing goes through DELETE /api/session, which is why both helpers below
+ * are async and touch the network.
+ */
 
 /**
  * Fired when the API rejects the stored token. The root layout listens and
@@ -18,20 +25,45 @@ const SESSION_COOKIE_TTL_SECONDS = 8 * 60 * 60; // mirrors SANCTUM_TOKEN_EXPIRAT
 export const UNAUTHORIZED_EVENT = 'quickwash:unauthorized';
 
 /**
- * The cookie is written with a lifetime only when the operator asked to stay
- * signed in. Without it, it is a session cookie: closing the browser ends the
- * session, which is the safe default for a shared terminal.
+ * Ask the server to mint (or refresh) the signed session cookie.
+ *
+ * The bearer token is the only thing presented; the server decides whether it
+ * is still good by asking Laravel. A failure here is deliberately NOT fatal to
+ * sign-in: every other part of the dashboard works on the bearer token alone,
+ * and only the camera proxy needs this cookie. Losing the camera feed is a
+ * worse outcome than losing it on a stale cookie, so it is logged and left to
+ * expire rather than turned into a rejected password.
  */
-function setSessionCookie(persistent: boolean) {
-  if (typeof window === 'undefined') return;
-  const secure = window.location.protocol === 'https:' ? '; Secure' : '';
-  const maxAge = persistent ? `; max-age=${SESSION_COOKIE_TTL_SECONDS}` : '';
-  document.cookie = `${SESSION_COOKIE}=1; path=/${maxAge}; SameSite=Lax${secure}`;
+async function syncSessionCookie(token: string, persistent: boolean): Promise<void> {
+  try {
+    await fetch('/api/session', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
+      credentials: 'same-origin',
+      // The cookie is HttpOnly, so the server owns its lifetime. It has to be
+      // told, or every cookie becomes a persistent one and a shared terminal
+      // keeps camera access until the full 8 hours are up.
+      body: JSON.stringify({ persistent }),
+    });
+  } catch {
+    /* offline or the route is unavailable; the bearer token still works */
+  }
 }
 
-function clearSessionCookie() {
-  if (typeof window === 'undefined') return;
-  document.cookie = `${SESSION_COOKIE}=; path=/; max-age=0`;
+/**
+ * Clear the session cookie. It is HttpOnly, so document.cookie cannot touch
+ * it and this has to be a server round trip.
+ */
+async function revokeSessionCookie(): Promise<void> {
+  try {
+    await fetch('/api/session', { method: 'DELETE', credentials: 'same-origin' });
+  } catch {
+    /* best effort - the cookie is signed and will expire on its own */
+  }
 }
 
 /** Typed login failures for actionable form feedback. */
@@ -198,7 +230,9 @@ class ApiClient {
       }
       this.setToken(null);
       clearAuthFlag();
-      clearSessionCookie();
+      // Not awaited: this runs on the rejection path, and the dispatch below
+      // is what takes the operator to /login. Nothing may sit in front of it.
+      void revokeSessionCookie();
 
       // Ask the shell to navigate, rather than assigning location.href.
       // A hard navigation tears down the whole app, so an expired token
@@ -264,7 +298,11 @@ class ApiClient {
       );
       this.setToken(data.token, keepSignedIn);
       writeAuthFlag(keepSignedIn);
-      setSessionCookie(keepSignedIn);
+      // Deliberately not awaited. Only the camera proxy needs this cookie -
+      // every other part of the dashboard works on the bearer token - so a slow
+      // or unreachable cookie route must never be able to delay or fail a
+      // sign-in. It settles on its own, and the camera page retries anyway.
+      void syncSessionCookie(data.token, keepSignedIn);
       return data;
     } catch (err) {
       if (err instanceof LoginError) throw err;
@@ -302,7 +340,7 @@ class ApiClient {
     }
     this.setToken(null);
     clearAuthFlag();
-    clearSessionCookie();
+    await revokeSessionCookie();
   }
 
   async getUser() {

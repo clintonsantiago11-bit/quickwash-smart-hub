@@ -12,19 +12,34 @@
 | a second frontend, a staging host.
 |
 | Vercel preview deployments get a fresh hashed URL on every push
-| (project-<hash>-<branch>.vercel.app), so they cannot be listed in advance.
-| They are matched by pattern instead. That used to be rejected here on
-| security grounds, and the reasoning was right but the conclusion was wrong:
-| the risk of a broad origin pattern is that it combines with
-| supports_credentials, because then any page could ride on the visitor's
-| cookies.
+| (<slug>-<hash>-<branch>.vercel.app), so they cannot be listed in advance.
+| They are matched by pattern instead.
 |
-| This API does not use cookies for authentication. Every request carries an
+| The pattern is built from VERCEL_PROJECT_SLUG, which you set to your Vercel
+| project's slug. It is deliberately NOT derived from FRONTEND_URL: production
+| commonly sits on a custom domain or alias whose host does not share the
+| project slug (here a production host of quickwash-smart-hub.vercel.app
+| alongside previews of the form quickwash-smart-<hash>-<branch>.vercel.app),
+| so deriving one from the other silently locks out every preview.
+|
+| If VERCEL_PROJECT_SLUG is unset there are no patterns at all and previews are
+| refused. That is the safe default: an unset variable must not widen the
+| allowlist.
+|
+| Residual risk worth stating plainly: Vercel previews are
+| <slug>-<hash>-<branch> and nothing in the shape distinguishes a real preview
+| from a different project whose name happens to start with the same slug. The
+| pattern therefore admits quickwash-smart-evil.vercel.app as well. It does
+| not admit attacker-victim.vercel.app, which is what the previous blanket
+| *.vercel.app pattern allowed.
+|
+| The risk of a broad origin pattern combines with supports_credentials,
+| because then any page could ride on the visitor's cookies. This API does
+| not use cookies for authentication. Every request carries an
 | Authorization: Bearer header built from the token in the dashboard's
 | localStorage, and nothing is readable cross-origin except through a header
-| the calling page does not have. So credentials are switched off below, and
-| with them the reason to fear a pattern. A hostile page on some other Vercel
-| deployment can reach this API but has no session to present and gets 401.
+| the calling page does not have. So a hostile page can reach this API but has
+| no session to present and gets 401.
 |
 | Set ALLOW_VERCEL_PREVIEWS=false to turn the pattern off and go back to a
 | strict list.
@@ -46,10 +61,17 @@ $origins = array_values(array_unique(array_filter(array_merge(
     $local,
 ))));
 
-$patterns = env('ALLOW_VERCEL_PREVIEWS', true)
-    // A real regex, because fruitcake/php-cors applies these with preg_match
-    // and does no glob expansion of its own.
-    ? ['#^https://[a-z0-9][a-z0-9-]*(\.[a-z0-9][a-z0-9-]*)*\.vercel\.app$#i']
+/**
+ * Pattern for this project's Vercel previews, anchored on the project slug.
+ *
+ * The optional hyphen-suffixed group is what lets <slug>-<hash>-<branch>
+ * through while still refusing a completely unrelated project.
+ */
+$slug = trim((string) env('VERCEL_PROJECT_SLUG', ''));
+$slug = preg_match('/^[a-z0-9][a-z0-9-]*$/i', $slug) ? strtolower($slug) : '';
+
+$patterns = env('ALLOW_VERCEL_PREVIEWS', true) && $slug !== ''
+    ? ['#^https://' . preg_quote($slug, '#') . '(-[a-z0-9][a-z0-9-]*)?\.vercel\.app$#i']
     : [];
 
 return [
