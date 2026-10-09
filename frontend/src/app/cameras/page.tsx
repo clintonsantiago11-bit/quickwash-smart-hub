@@ -5,6 +5,7 @@ import MjpegPlayer from '@/components/MjpegPlayer';
 import { Camera, AlertCircle, Maximize2, Settings, X } from 'lucide-react';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { socketService } from '@/lib/socket';
+import { usePolling } from '@/lib/usePolling';
 
 interface CameraFeed {
   id: string;
@@ -96,15 +97,22 @@ export default function CamerasPage() {
     }
   }, []);
 
+  const probeAll = useCallback(() => {
+    initialCameras.forEach((cam) => probeCamera(cam));
+  }, [probeCamera]);
+
+  // Polls through the shared hook rather than a bare setInterval so this stops
+  // while the tab is hidden. A camera probe briefly holds the ESP32-CAM's single
+  // stream slot, so a background tab probing every 10s is not just wasted API
+  // work - it can keep a real viewer waiting for the slot to free up.
+  usePolling(probeAll, { everyMs: 10000, jitterMs: 2500 });
+
   useEffect(() => {
     // Connect to Socket.IO to listen for Camera MQTT heartbeats
     socketService.connect();
 
-    const probeAll = () => {
-      initialCameras.forEach(cam => probeCamera(cam));
-    };
+    // First probe is explicit: usePolling waits a full interval before firing.
     probeAll();
-    const probeInterval = setInterval(probeAll, 10000);
 
     const removeListener = socketService.onHardwareUpdate((msg: HardwareUpdate) => {
       // If a camera sends a status update with a stream_url, mark it online
@@ -121,9 +129,9 @@ export default function CamerasPage() {
 
     return () => {
       removeListener();
-      clearInterval(probeInterval);
+      // The probe timer is owned by usePolling, which cleans itself up.
     };
-  }, [probeCamera]);
+  }, [probeAll]);
 
   return (
     <>

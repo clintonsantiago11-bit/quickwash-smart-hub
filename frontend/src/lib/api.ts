@@ -84,8 +84,32 @@ function readStoredToken(): string | null {
 }
 
 /**
+ * Whether this browser currently holds a session.
+ *
+ * Exported so the route guard does not have to re-derive it. The previous
+ * version of the guard did exactly that and got it wrong in a way that was
+ * invisible: it read `localStorage.getItem('isAuthenticated')`, which is the
+ * STRING 'false' when "keep me signed in" was unticked - and a non-empty
+ * string is truthy, so `!isAuth` was always false and the redirect to /login
+ * never fired for anyone. It looked like it worked because an API 401 does
+ * eventually route them out; the guard itself was inert.
+ *
+ * The token is the source of truth, and it lives in sessionStorage unless the
+ * operator opted into persistence. Both stores are checked, because a new tab
+ * has fresh sessionStorage but may still hold a persisted token.
+ */
+export function hasStoredSession(): boolean {
+  if (typeof window === 'undefined') return false;
+  return readStoredToken() !== null;
+}
+
+/**
  * The signed-in marker follows the token, so a stale flag from a previous
  * session cannot claim a session that has gone.
+ *
+ * It is informational only - nothing should gate on it, because a string in
+ * storage is too easy to read as a boolean by accident. See
+ * hasStoredSession() for the real check.
  */
 function writeAuthFlag(persistent: boolean) {
   try {

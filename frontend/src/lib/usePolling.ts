@@ -39,13 +39,19 @@ export function usePolling(
     let timer: ReturnType<typeof setTimeout> | null = null;
     let stopped = false;
 
+    const isHidden = () =>
+      pauseWhenHidden && typeof document !== 'undefined' && document.hidden;
+
     const schedule = () => {
       if (stopped) return;
       if (timer) clearTimeout(timer);
 
-      const hidden = pauseWhenHidden && typeof document !== 'undefined' && document.hidden;
       timer = setTimeout(() => {
-        if (!hidden) latest.current();
+        // Read document.hidden HERE, when the timer actually fires, not when
+        // it was scheduled. Sampling it at schedule time meant a tab hidden
+        // afterwards still fired one poll, and the timer re-armed forever in a
+        // background tab - the exact cost this hook exists to avoid.
+        if (!isHidden()) latest.current();
         schedule();
       }, everyMs + (jitterMs ? Math.random() * jitterMs : 0));
     };

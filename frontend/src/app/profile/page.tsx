@@ -292,7 +292,10 @@ export default function ProfilePage() {
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={profile.avatar_url}
-                    alt=""
+                    // Was alt="", which marks the image decorative and makes a
+                    // screen reader skip it. It is the operator's own photo, so
+                    // it should carry their name.
+                    alt={`${profile.full_name} profile photo`}
                     className="h-32 w-32 rounded-full border-2 border-[var(--accent)] object-cover"
                   />
                 ) : (

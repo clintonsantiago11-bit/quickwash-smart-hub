@@ -4,6 +4,7 @@ import { CheckCircle2, RefreshCw, Save, Settings, Timer, Wifi, WifiOff } from 'l
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { socketService, type NaekConfigPayload, type NaekProduct } from '@/lib/socket';
+import { usePolling } from '@/lib/usePolling';
 
 interface NaekConfigApi {
   device_id: string;
@@ -72,11 +73,16 @@ export default function NaekConfigCard() {
     }
   };
 
+  // Polls through the shared hook rather than a bare setInterval, so this card
+  // pauses while the tab is hidden and jitters like every other page instead of
+  // hammering the API every 5s from a background tab. The initial fetch stays
+  // explicit because usePolling does not fire immediately.
+  usePolling(() => void refresh(), { everyMs: 5000, jitterMs: 1500 });
+
   useEffect(() => {
     socketService.connect();
     // eslint-disable-next-line react-hooks/set-state-in-effect -- initial fetch of external socket state, established repo convention
     refresh();
-    const interval = setInterval(refresh, 5000);
     const off = socketService.onConnectionChange(setConnected);
     const offCfg = socketService.onNaekConfig((payload: NaekConfigPayload) => {
       setShopName(payload.shopName ?? '');
@@ -93,7 +99,7 @@ export default function NaekConfigCard() {
       setLastSync(new Date(payload.timestamp).toLocaleTimeString('en-PH', { hour12: false }));
     });
     return () => {
-      clearInterval(interval);
+      // The polling timer is owned by usePolling, which cleans itself up.
       off();
       offCfg();
     };

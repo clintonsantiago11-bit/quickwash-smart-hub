@@ -5,6 +5,7 @@ import Sidebar from "@/components/Sidebar";
 import { useUI } from "@/providers/UIProvider";
 import { useRouter, usePathname } from 'next/navigation';
 import { useEffect } from 'react';
+import { hasStoredSession } from '@/lib/api';
 
 export default function LayoutContent({ children }: { children: React.ReactNode }) {
   const { isSidebarCollapsed } = useUI();
@@ -18,9 +19,12 @@ export default function LayoutContent({ children }: { children: React.ReactNode 
   }, []);
 
   useEffect(() => {
-    const isAuth = localStorage.getItem('isAuthenticated');
-    const token = localStorage.getItem('auth_token');
-    if (!isAuth && !token && pathname !== '/login') {
+    // One helper, one source of truth. The old inline version read
+    // `isAuthenticated` and treated it as a boolean, but what is in storage is
+    // the string 'false' - truthy - so this branch never fired and the guard
+    // was decorative. It also read only localStorage, missing the token that
+    // lives in sessionStorage unless "keep me signed in" was ticked.
+    if (pathname !== '/login' && !hasStoredSession()) {
       router.push('/login');
     }
   }, [pathname, router]);

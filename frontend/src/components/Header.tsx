@@ -140,8 +140,9 @@ export default function Header({ title, subtitle }: HeaderProps) {
     >
       {/* Left Section: Menu & Brand */}
       <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-1 md:flex-initial">
-        <button 
+<button 
           onClick={toggleMobileMenu}
+          aria-label="Open navigation menu"
           className="md:hidden text-[var(--text-primary)] p-1.5 hover:bg-[var(--bg-hover)] rounded-lg transition-colors shrink-0"
         >
           <Menu size={22} />
@@ -217,7 +218,9 @@ export default function Header({ title, subtitle }: HeaderProps) {
         {/* Search Trigger (Mobile) */}
         <div className="md:hidden relative">
           <button
-            onClick={() => toggleDropdown('search')}
+onClick={() => toggleDropdown('search')}
+            aria-label="Search"
+            aria-expanded={activeDropdown === 'search'}
             className={`w-9 h-9 flex items-center justify-center rounded-lg transition-colors ${activeDropdown === 'search' ? 'text-[var(--accent)]' : 'text-[var(--text-muted)]'}`}
           >
             <Search size={20} />
@@ -235,7 +238,9 @@ export default function Header({ title, subtitle }: HeaderProps) {
         {/* Notifications Icon */}
         <div className="relative">
           <button
-            onClick={() => toggleDropdown('notifications')}
+onClick={() => toggleDropdown('notifications')}
+            aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : 'Notifications'}
+            aria-expanded={activeDropdown === 'notifications'}
             className={`relative w-9 h-9 flex items-center justify-center rounded-lg transition-colors hover:bg-[var(--bg-hover)] ${activeDropdown === 'notifications' ? 'text-[var(--accent)] bg-[var(--bg-hover)]' : 'text-[var(--text-muted)]'}`}
           >
             <Bell size={18} />
@@ -302,7 +307,8 @@ export default function Header({ title, subtitle }: HeaderProps) {
 
         {/* Theme Toggle (Tablet/Desktop) */}
         <button
-          onClick={toggleTheme}
+onClick={toggleTheme}
+          aria-label={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
           className="hidden md:flex w-9 h-9 items-center justify-center rounded-lg transition-colors hover:bg-[var(--bg-hover)]"
           style={{ color: 'var(--text-muted)' }}
         >
@@ -312,7 +318,9 @@ export default function Header({ title, subtitle }: HeaderProps) {
         {/* Profile / Account Dropdown */}
         <div className="relative">
           <button
-            onClick={() => toggleDropdown('user')}
+onClick={() => toggleDropdown('user')}
+            aria-label="Account menu"
+            aria-expanded={activeDropdown === 'user'}
             className="w-9 h-9 rounded-full flex items-center justify-center border-2 border-transparent hover:border-[var(--accent)] transition-all overflow-hidden"
             style={{ background: 'var(--bg-elevated)' }}
           >

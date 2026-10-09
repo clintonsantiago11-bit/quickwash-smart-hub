@@ -1,7 +1,5 @@
 import { io, Socket } from 'socket.io-client';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
-
 /**
  * The live bridge is optional. In a cloud deployment it is usually not
  * configured, and falling back to a localhost default made every browser
@@ -180,15 +178,23 @@ class SocketService {
     };
   }
 
+  /**
+   * Sending a device command does NOT belong here.
+   *
+   * This was dead code that read the token from localStorage only, so it would
+   * have sent `Bearer null` for anyone who left "keep me signed in" unticked -
+   * the default - because their token is in sessionStorage. Every real caller
+   * already uses api.sendCommand(), which reads both stores and attaches the
+   * Authorization header consistently.
+   *
+   * Kept as a delegating wrapper rather than deleted so the two paths cannot
+   * drift again: if anything ever calls it, it now goes through the one code
+   * path that works. Note it still returns void rather than a promise, so
+   * callers cannot await it - use api.sendCommand() when you need to.
+   */
   sendCommand(deviceId: string, action: string) {
-    fetch(`${API_BASE}/devices/${deviceId}/command`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
-      },
-      body: JSON.stringify({ action }),
-    }).catch(err => console.error('Failed to send command:', err));
+    void import('@/lib/api').then(({ api }) => api.sendCommand(deviceId, action))
+      .catch(err => console.error('Failed to send command:', err));
   }
 }
 

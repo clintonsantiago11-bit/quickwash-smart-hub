@@ -81,7 +81,7 @@ export default function Sidebar() {
         )}
         {/* Mobile close button */}
         {isMobileMenuOpen && (
-          <button onClick={closeMobileMenu} className="md:hidden text-[var(--text-muted)] p-1">
+          <button onClick={closeMobileMenu} aria-label="Close navigation menu" className="md:hidden text-[var(--text-muted)] p-1">
             <X size={20} />
           </button>
         )}
