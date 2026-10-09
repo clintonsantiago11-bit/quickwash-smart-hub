@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\AuditController;
 use App\Http\Controllers\Api\NaekIngestController;
 use App\Http\Controllers\Api\NaekConfigController;
+use App\Http\Controllers\Api\SystemSettingController;
 
 Route::options('/{any}', function () {
     return response('', 200);
@@ -50,6 +51,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/analytics/revenue', [AnalyticsController::class, 'revenue']);
     Route::get('/analytics/washes', [AnalyticsController::class, 'washes']);
     Route::get('/analytics/peak-hours', [AnalyticsController::class, 'peakHours']);
+
+    // System settings. Readable by anyone signed in - a technician needs to
+    // see what the thresholds are to diagnose an alert - but writing them
+    // changes machine behaviour and is gated like the vending settings.
+    Route::get('/settings', [SystemSettingController::class, 'show']);
+    Route::put('/settings', [SystemSettingController::class, 'update'])
+        ->middleware('role:admin,manager', 'throttle:30,1');
 
     Route::get('/audit-logs', [AuditController::class, 'index'])->middleware('role:admin');
     Route::get('/audit-logs/retention', [AuditController::class, 'retention'])->middleware('role:admin');

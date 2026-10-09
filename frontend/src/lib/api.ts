@@ -411,6 +411,13 @@ class ApiClient {
   // Dashboard
   getDashboardStats() { return this.get('/dashboard/stats'); }
 
+  // System settings
+  // Any signed-in user may read (a technician needs to see the thresholds to
+  // diagnose an alert); the write is gated by role and returns 403 otherwise,
+  // so the page uses `can_edit` from the read to hide the button.
+  getSystemSettings() { return this.get('/settings'); }
+  updateSystemSettings(data: Record<string, unknown>) { return this.put('/settings', data); }
+
   // Audit
   getAuditLogs(params?: Record<string, string>) {
     const qs = params ? `?${new URLSearchParams(params).toString()}` : '';
