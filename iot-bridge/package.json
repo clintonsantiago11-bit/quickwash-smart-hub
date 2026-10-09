@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "node --test thresholds.test.js relay-auth.test.js"
+    "test": "node --test thresholds.test.js relay-auth.test.js naek-agent.test.js"
   },
   "keywords": [],
   "author": "",
@@ -19,4 +19,5 @@
     "socket.io": "^4.8.3"
   }
 }
+
 

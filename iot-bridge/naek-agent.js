@@ -35,7 +35,18 @@ const NAEK_DEVICE_NAME = process.env.NAEK_DEVICE_NAME || 'NAEK 3-in-1 Carwash Ti
 const NAEK_POLL_MS = Math.max(5000, parseInt(process.env.NAEK_POLL_MS || '5000', 10));
 const NAEK_SINK = (process.env.NAEK_SINK || 'db').toLowerCase();
 const NAEK_API_URL = (process.env.NAEK_API_URL || 'http://localhost:8000/api').replace(/\/+$/, '');
-const NAEK_API_KEY = process.env.NAEK_API_KEY || 'quickwash-bridge-key';
+// Blank by default, NOT a literal fallback.
+//
+// This used to fall back to 'quickwash-bridge-key', the same string that
+// backend/.env.example shipped as NAEK_INGEST_KEY. Both were published in this
+// repository, so a deployment that set neither variable ended up running the
+// cloud ingest endpoint with a publicly known key - and that endpoint writes
+// directly into vending_transactions and wash_logs.
+//
+// The API refuses ingest when its own key is blank, so the two sides fail
+// closed together: an unset key here means ingest is rejected rather than
+// accepted by anyone who read this file.
+const NAEK_API_KEY = process.env.NAEK_API_KEY || '';
 const FETCH_TIMEOUT_MS = 8000;
 
 let io = null;
@@ -59,7 +70,10 @@ function parseNaekPage(html) {
   const products = [];
   let m;
   while ((m = rowRe.exec(html)) !== null) {
-    products.push({ name: m[1].trim(), rate: parseInt(m[2], 10), duration: parseInt(m[3], 10), status: m[4], usage: parseInt(m[5], 10), net: parseInt(m[6], 10) });
+    // slot is the row's position, which is the device's own stable index for a
+    // product. Carried on every product so sale detection can match on it: the
+    // operator can rename a product, and a name is not a stable identity.
+    products.push({ slot: products.length, name: m[1].trim(), rate: parseInt(m[2], 10), duration: parseInt(m[3], 10), status: m[4], usage: parseInt(m[5], 10), net: parseInt(m[6], 10) });
   }
   const pause = {};
   while ((m = pauseRe.exec(html)) !== null) pause[m[1]] = m[2].includes('checked');
@@ -80,17 +94,53 @@ function fetchNaekPage() {
     .then((res) => { if (!res.ok) throw new Error(`HTTP ${res.status} from ${NAEK_HOST}`); return res.text(); });
 }
 
+/**
+ * Work out what changed between two readings of the NAEK page.
+ *
+ * Products are matched BY SLOT, never by name. Matching on name was wrong in
+ * two directions, both of which reach the revenue numbers:
+ *
+ *  - A rename lost the sale. Renaming WASH to PREMIUM and selling one unit in
+ *    the same poll produced NO events at all, because the new name was not in
+ *    the previous snapshot and the loop `continue`d past it. The coins were
+ *    taken and nothing was booked.
+ *  - Duplicate names invented a sale. If the device reported two products both
+ *    called WASH, the name-keyed map kept the first, so the second appeared to
+ *    have jumped by its whole usage count and booked a large phantom sale.
+ *
+ * Slot is the device's own stable index for a product (0,1,2) and is what the
+ * mirror table is keyed on, so it is the only identifier that survives a rename.
+ *
+ * The amount uses the rate read in the CURRENT snapshot. That is the best
+ * available figure: this device exposes a usage counter, not a per-sale price,
+ * so a rate change mid-window cannot be attributed exactly. It is worth knowing
+ * that revenue for the window is priced at the new rate.
+ */
 function diffSnapshots(curr, prevSnap) {
   const events = [];
-  const before = new Map(prevSnap.products.map((p) => [p.name, p]));
-  for (const p of curr.products) {
-    const was = before.get(p.name);
-    if (!was) continue;
+
+  // Slot is the identity. Fall back to name only when the device omitted the
+  // slot, which the stock page always provides.
+  const key = (p, index) => (p.slot !== undefined ? `s${p.slot}` : `n${index}`);
+
+  const before = new Map(prevSnap.products.map((p, i) => [key(p, i), p]));
+
+  curr.products.forEach((p, i) => {
+    const was = before.get(key(p, i));
+    if (!was) return; // A product the previous poll did not report: no baseline, so no delta.
+
     const delta = p.usage - was.usage;
-    if (delta > 0) events.push({ type: 'sale', product: p.name, count: delta, amount: p.rate * delta, durationSeconds: p.duration });
-    else if (delta < 0) events.push({ type: 'sales_reset', product: p.name });
+    if (delta > 0) {
+      events.push({ type: 'sale', product: p.name, count: delta, amount: p.rate * delta, durationSeconds: p.duration });
+    } else if (delta < 0) {
+      events.push({ type: 'sales_reset', product: p.name });
+    }
+  });
+
+  if (curr.totalSales < prevSnap.totalSales) {
+    events.push({ type: 'total_reset', from: prevSnap.totalSales, to: curr.totalSales });
   }
-  if (curr.totalSales < prevSnap.totalSales) events.push({ type: 'total_reset', from: prevSnap.totalSales, to: curr.totalSales });
+
   return events;
 }
 
@@ -291,6 +341,16 @@ async function poll() {
 }
 
 function start(ioServer) {
+  // Say so plainly when the cloud sink is configured with no credential, rather
+  // than letting every poll fail with a 401 the operator has to decode.
+  if (NAEK_SINK === 'api' && !NAEK_API_KEY) {
+    console.error(
+      '[NAEK] NAEK_SINK=api but NAEK_API_KEY is empty. Every ingest will be ' +
+        'rejected by the API. Generate one (openssl rand -hex 24) and set it ' +
+        'here and as NAEK_INGEST_KEY on the API.'
+    );
+  }
+
   if (running) return;
   running = true;
   io = ioServer || null;
