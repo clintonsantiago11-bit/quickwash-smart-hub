@@ -114,4 +114,113 @@ class AuthTest extends TestCase
     {
         $this->getJson('/api/health')->assertStatus(200)->assertJson(['status' => 'online']);
     }
+
+    /**
+     * A failed sign-in writes the submitted address into the audit trail, and
+     * this endpoint is unauthenticated - so whatever arrives in the email field
+     * is stored. An administrator exports that trail from /audit and opens it
+     * in a spreadsheet, where a leading = + - @ or tab is a formula that runs
+     * when the file is opened. The export neutralises those characters, and
+     * this asserts the stored row is already safe as a second layer.
+     */
+    public function test_a_formula_in_the_email_field_is_neutralised_in_the_audit_row(): void
+    {
+        $payloads = [
+            "=cmd|'/c calc'!A1",
+            '+1+1',
+            '-2+3',
+            '@SUM(A1:A9)',
+        ];
+
+        foreach ($payloads as $payload) {
+            $this->postJson('/api/auth/login', [
+                'email' => $payload,
+                'password' => 'definitely-wrong',
+            ])->assertStatus(422);
+
+            $log = \App\Models\AuditLog::where('action', 'FAILED_LOGIN')
+                ->where('user', 'Unknown')
+                ->latest('id')
+                ->firstOrFail();
+
+            // Read the address back out of the sentence rather than assuming a
+            // quote delimiter: an unquoted address keeps its own text intact.
+            $this->assertMatchesRegularExpression(
+                "/A sign-in attempt for '?.*'? was rejected/",
+                $log->details,
+                'the row must still read as a failed attempt',
+            );
+
+            // The value is whatever sits between the delimiters. Whatever it is,
+            // its first character must not be one a spreadsheet evaluates.
+            $matched = preg_match("/A sign-in attempt for '?(.*?)'? was rejected/", $log->details, $m);
+            $this->assertSame(1, $matched, $log->details);
+
+            $value = $m[1];
+            if ($value !== '') {
+                $this->assertNotContains(
+                    mb_substr($value, 0, 1),
+                    ['=', '+', '-', '@', "\t", "\r"],
+                    "payload {$payload} left an executable character at the start of the stored value",
+                );
+            }
+        }
+    }
+
+    public function test_control_characters_are_stripped_from_the_audit_row(): void
+    {
+        // A newline in the stored row forges extra lines when the trail is
+        // read as text or exported.
+        $this->postJson('/api/auth/login', [
+            'email' => "victim@example.com\nFORGED: admin signed in",
+            'password' => 'definitely-wrong',
+        ])->assertStatus(422);
+
+        $log = \App\Models\AuditLog::where('action', 'FAILED_LOGIN')
+            ->where('user', 'Unknown')
+            ->latest('id')
+            ->firstOrFail();
+
+        $this->assertStringNotContainsString("\n", $log->details);
+        $this->assertStringNotContainsString("\r", $log->details);
+    }
+
+    public function test_an_absurdly_long_email_is_truncated(): void
+    {
+        // The column is TEXT so this is not an insert failure, but it is a free
+        // way to fill the audit table from an unauthenticated endpoint.
+        $this->postJson('/api/auth/login', [
+            'email' => 'a@b.test' . str_repeat('x', 5000),
+            'password' => 'definitely-wrong',
+        ])->assertStatus(422);
+
+        $log = \App\Models\AuditLog::where('action', 'FAILED_LOGIN')
+            ->where('user', 'Unknown')
+            ->latest('id')
+            ->firstOrFail();
+
+        $this->assertLessThan(
+            400,
+            mb_strlen($log->details),
+            'the stored row must stay a readable length',
+        );
+    }
+
+    public function test_an_ordinary_failed_address_is_still_recorded(): void
+    {
+        // The sanitiser must not mangle normal traffic, or the audit trail
+        // stops being useful for spotting a pattern of attempts.
+        $this->postJson('/api/auth/login', [
+            'email' => 'someone@example.com',
+            'password' => 'definitely-wrong',
+        ])->assertStatus(422);
+
+        $log = \App\Models\AuditLog::where('action', 'FAILED_LOGIN')
+            ->where('user', 'Unknown')
+            ->latest('id')
+            ->firstOrFail();
+
+        $this->assertStringContainsString('someone@example.com', $log->details);
+        $this->assertStringContainsString('rejected', $log->details);
+    }
 }

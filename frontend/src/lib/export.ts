@@ -21,10 +21,41 @@ export function toMatrix(rows: Record<string, unknown>[]): Matrix {
   };
 }
 
-const csvCell = (cell: Cell) => {
-  const text = String(cell);
-  return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
-};
+/**
+ * RFC 4180 quoting, plus spreadsheet formula neutralisation.
+ *
+ * Quoting alone is not enough. Excel, LibreOffice and Google Sheets all treat a
+ * cell whose first character is = + - @ (or a leading tab/CR) as a FORMULA, not
+ * text, and evaluate it when the file is opened. RFC 4180 quoting does not
+ * prevent that - the quotes are stripped by the parser and the cell is
+ * evaluated.
+ *
+ * This is reachable here without any privilege: AuthController writes the
+ * submitted email into audit_logs.details on every failed sign-in, so an
+ * unauthenticated POST to /api/auth/login plants whatever an attacker sends in
+ * the email field. An administrator who later exports the audit trail to CSV or
+ * Excel and double-clicks a cell has that formula evaluated on their own
+ * machine. `=cmd|'/c calc'!A1` runs a command; `=HYPERLINK(...)` exfiltrates.
+ *
+ * Prefixing with a single quote forces the cell to be read as text, which is
+ * how Excel's own "treat as text" works. The quote is part of the cell
+ * contents in a strict CSV reader, so it is only inserted for values that
+ * actually need it rather than for every cell, which would corrupt ordinary
+ * data.
+ */
+const FORMULA_TRIGGER = /^[=+\-@ \t\r]/;
+
+export function escapeCsvCell(cell: Cell): string {
+  const raw = String(cell);
+
+  // Only a real string can be a formula - a number cannot start with '='.
+  const guarded =
+    typeof cell === 'string' && FORMULA_TRIGGER.test(raw) ? `'${raw}` : raw;
+
+  return /[",\n\r]/.test(guarded) ? `"${guarded.replace(/"/g, '""')}"` : guarded;
+}
+
+const csvCell = escapeCsvCell;
 
 /** RFC 4180 quoting so commas, quotes and newlines cannot break a column. */
 export function toCsv(matrix: Matrix): string {

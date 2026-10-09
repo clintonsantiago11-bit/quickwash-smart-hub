@@ -30,6 +30,40 @@ class AuthController extends Controller
      * attempts and makes this control look like it is working when it is not.
      * Say so loudly in the logs rather than fail the request.
      */
+    /**
+     * Make an attacker-supplied string safe to store in the audit trail.
+     *
+     * Two things are wrong with writing request input straight into a row
+     * that an administrator later exports:
+     *
+     *  - an unbounded length. The column is TEXT so this is not an insert
+     *    failure, but a megabyte per failed attempt is a free way to fill the
+     *    table, and the row is useless to read.
+     *  - leading characters that a spreadsheet treats as a formula. The export
+     *    neutralises those too; this is the layer that stops it reaching the
+     *    table in the first place.
+     *
+     * Control characters are dropped rather than escaped so the value cannot
+     * forge extra lines or columns when someone reads the row as text.
+     *
+     * The first character is prefixed with a visible marker rather than a bare
+     * apostrophe, because an apostrophe is invisible in the audit view and
+     * would look like tampering.
+     */
+    private function sanitiseForAudit(?string $value): string
+    {
+        $clean = preg_replace('/[\x00-\x1F\x7F]/u', '', (string) $value) ?? '';
+        $clean = mb_substr($clean, 0, 254);
+
+        // Anything a spreadsheet would evaluate, or that is simply not an
+        // email, is not worth keeping verbatim.
+        if ($clean !== '' && preg_match('/^[=+\-@\s]/u', $clean)) {
+            return "'" . $clean;
+        }
+
+        return $clean;
+    }
+
     private function warnIfLockoutWillNotSurviveARestart(): void
     {
         if (config('cache.default') !== 'file') {
@@ -82,11 +116,24 @@ class AuthController extends Controller
             // Written inline, not deferred. Deferring it would save a round
             // trip, but a lost entry in the audit trail is a worse trade than
             // a few hundred milliseconds of sign-in time.
+            //
+            // The submitted address is written verbatim, and this endpoint is
+            // unauthenticated, so whatever arrives in the email field lands in
+            // the audit trail. An administrator who exports the trail from
+            // /audit would carry that text into a spreadsheet, where a leading
+            // = + - @ or tab is a formula that executes when the file is
+            // opened. Truncating keeps the row useful for spotting a pattern
+            // without letting one line become an attack on the person reading
+            // it. The export also neutralises leading characters as a second
+            // layer, because other audit rows are written from device names and
+            // operator-supplied text too.
             AuditLog::create([
                 'user' => 'Unknown',
                 'ip_address' => $request->ip(),
                 'action' => 'FAILED_LOGIN',
-                'details' => "A sign-in attempt for '{$request->email}' was rejected (wrong email or password)",
+                'details' => 'A sign-in attempt for '
+                    . $this->sanitiseForAudit($request->email)
+                    . ' was rejected (wrong email or password)',
             ]);
 
             throw ValidationException::withMessages([
