@@ -145,10 +145,29 @@ counted.
 ### Live vendo updates (optional)
 
 The dashboard polls REST and works without the socket. For live vendo/NAEK
-cards, expose the bridge either by running it as another Railway service
-(requires the NAEK agent + API sink to match) or by tunneling the carwash
-bridge: `cloudflared tunnel --url http://localhost:3001` and set
-`NEXT_PUBLIC_WS_URL` to that URL.
+cards, expose the bridge either by running it as another service (requires the
+NAEK agent + API sink to match) or by tunneling the carwash bridge:
+`cloudflared tunnel --url http://localhost:3001` and set `NEXT_PUBLIC_WS_URL` to
+that URL.
+
+### The bridge is now authenticated — this matters when it is exposed
+
+`BRIDGE_API_KEY` gates **every** bridge endpoint, including `/camera/stream`.
+That endpoint relays a live feed of the wash bay, and the ESP32-CAM in front of
+it authenticates nothing at all, so the bridge is the only credential in the
+path. Before this, following the tunnel instruction above put an unauthenticated
+camera feed on the internet.
+
+- The bridge compares the key with `timingSafeEqual`, header-only.
+- **The browser never holds it.** A `NEXT_PUBLIC_` variable is inlined into the
+  bundle and readable by anyone who opens the page, so the dashboard does not
+  contact the relay directly — `/api/camera/stream` does, server-side.
+- On the frontend set `CAMERA_RELAY_URL` (the tunnel base URL) and
+  `CAMERA_RELAY_KEY` (the same value as the bridge's `BRIDGE_API_KEY`).
+  `NEXT_PUBLIC_CAMERA_RELAY_URL` is now only a yes/no marker telling the camera
+  page which message to show; it is never used to build a request.
+- A `401` from the relay is reported as a key mismatch rather than an empty
+  player, because that is the failure this introduces.
 
 ### Low-supply thresholds
 
@@ -257,11 +276,20 @@ up. On Pro the cap rises to 800s.
 - [x] Laravel CORS restricted to `FRONTEND_URL` (env, no wildcard in production)
 - [x] NAEK ingest protected by a rotated API key
 - [x] `APP_DEBUG=false`, `TRUSTED_PROXIES=*` behind the platform LB
-- [ ] Replace public MQTT broker (`broker.hivemq.com`) with authenticated
-      HiveMQ Cloud / EMQX (free tier) — public topics are readable today
+- [ ] Replace public MQTT broker (`broker.hivemq.com`) with an authenticated
+      HiveMQ Cloud / EMQX (free tier). The bridge now passes `MQTT_USERNAME` /
+      `MQTT_PASSWORD` through, so setting them is all that is needed — but until
+      `MQTT_BROKER` is changed, anyone can both read *and forge* `quickwash/#`
+      telemetry and sale events
 - [ ] Rotate the NAEK ingest key and set a fixed `APP_KEY` before going live
-- [ ] Camera MJPEG stays behind the Next.js `/api/camera` proxy (never the raw
+- [x] Camera MJPEG stays behind the Next.js `/api/camera` proxy (never the raw
       camera URL) — required on HTTPS pages
+- [x] Camera proxy gated on a signed HttpOnly cookie; `/reg`, `/greg`, `/xclk`
+      and `/pll` are never forwarded to the camera
+- [x] Every `iot-bridge` endpoint requires `BRIDGE_API_KEY`, including the
+      camera relay, and the key never reaches the browser
+- [x] `MQTT_USERNAME` / `MQTT_PASSWORD` are actually passed to the MQTT connect
+      — they were documented but never read, so a private broker could not be used
 
 ## Notes
 

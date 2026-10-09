@@ -150,8 +150,9 @@ export default function MjpegPlayer({
           {failed && (
             <p className="max-w-sm text-[11px] leading-relaxed opacity-60" style={{ color: 'var(--text-muted)' }}>
               The camera is on the wash-bay network, which this site cannot reach directly.
-              Set <code className="font-mono">NEXT_PUBLIC_CAMERA_RELAY_URL</code> to the IoT
-              bridge exposed publicly so it can relay the stream.
+              Set <code className="font-mono">CAMERA_RELAY_URL</code> on the frontend to the IoT
+              bridge exposed publicly; the stream is routed through it server-side so the
+              bridge&rsquo;s key never reaches the browser.
             </p>
           )}
         </>

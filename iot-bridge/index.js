@@ -14,12 +14,15 @@ const { Server } = require('socket.io');
 const mqtt = require('mqtt');
 const cors = require('cors');
 require('dotenv').config();
+const { timingSafeEqual } = require('node:crypto');
 const db = require('./db');
 const thresholdStore = require('./thresholds-store');
 
 // Configuration
 const PORT = process.env.PORT || 3001;
 const MQTT_BROKER = process.env.MQTT_BROKER || 'mqtt://broker.hivemq.com';
+const MQTT_USERNAME = process.env.MQTT_USERNAME || '';
+const MQTT_PASSWORD = process.env.MQTT_PASSWORD || '';
 const FACILITY_ID = process.env.FACILITY_ID || 'quickwash_main';
 const API_KEY = process.env.BRIDGE_API_KEY || ''; // Fail closed: empty key = no admin access
 // Explicit CORS allowlist (comma-separated). Never use '*' in production.
@@ -45,7 +48,16 @@ const io = new Server(server, {
 // closed: if BRIDGE_API_KEY is unset, every request is rejected.
 function requireApiKey(req, res, next) {
   const key = req.headers['x-api-key'];
-  if (!API_KEY || key !== API_KEY) {
+  // timingSafeEqual rather than !==: the comparison is against a shared secret
+  // that gates a live camera feed, and a byte-at-a-time timing oracle on a
+  // network-reachable endpoint is a real leak. Equal length is checked first
+  // because timingSafeEqual throws on a length mismatch.
+  if (!API_KEY) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  const a = Buffer.from(String(key || ''), 'utf8');
+  const b = Buffer.from(API_KEY, 'utf8');
+  if (a.length !== b.length || !timingSafeEqual(a, b)) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
   next();
@@ -53,10 +65,22 @@ function requireApiKey(req, res, next) {
 
 // MQTT Client
 console.log(`Connecting to MQTT Broker: ${MQTT_BROKER}...`);
+// Credentials are passed through when configured. .env.example documented
+// MQTT_USERNAME / MQTT_PASSWORD and said to use them for a private broker, but
+// nothing ever read them, so following that advice connected to the private
+// broker anonymously and failed. Optional rather than required, because the
+// public bench broker broker.hivemq.com takes no credentials and this still
+// has to run for a demo.
+const mqttAuth =
+  MQTT_USERNAME && MQTT_PASSWORD
+    ? { username: MQTT_USERNAME, password: MQTT_PASSWORD }
+    : {};
+
 const mqttClient = mqtt.connect(MQTT_BROKER, {
   clientId: `quickwash_bridge_${Math.random().toString(16).substring(2, 8)}`,
   reconnectPeriod: 5000,
-  connectTimeout: 10000
+  connectTimeout: 10000,
+  ...mqttAuth
 });
 
 mqttClient.on('connect', () => {
@@ -227,7 +251,19 @@ const CAMERA_TIMEOUT_MS = Number(process.env.CAMERA_TIMEOUT_MS || 6000);
 
 let cameraBusy = null;
 
-app.get('/camera/status', async (req, res) => {
+// The camera relay is gated, not just the profile endpoints.
+//
+// DEPLOY.md tells operators to expose this agent with
+// `cloudflared tunnel --url http://localhost:3001`. Before this, that left
+// /camera/stream open to anyone holding the tunnel URL: a live feed of the wash
+// bay, from the internet, with no credential. The ESP32-CAM authenticates
+// nothing itself, so this process is the only boundary there is.
+//
+// Header-only, never a query parameter. A key in the URL lands in access logs,
+// browser history and Referer headers, which is exactly why the profile
+// endpoints above already refuse to take it that way. The caller is the
+// dashboard's server-side proxy, which can hold the key without publishing it.
+app.get('/camera/status', requireApiKey, async (req, res) => {
   const url = `${CAMERA_HOST}/`;
   try {
     const r = await fetch(url, { signal: AbortSignal.timeout(CAMERA_TIMEOUT_MS) });
@@ -249,7 +285,7 @@ app.get('/camera/status', async (req, res) => {
   }
 });
 
-app.get('/camera/stream', async (req, res) => {
+app.get('/camera/stream', requireApiKey, async (req, res) => {
   // The ESP32-CAM serves one client at a time; a second connection is accepted
   // and never produces frames, which looks like a frozen player.
   if (cameraBusy) {

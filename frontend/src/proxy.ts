@@ -3,6 +3,9 @@ import { NextResponse, type NextRequest } from 'next/server';
 /**
  * Server-side auth guard for the QuickWash Smart Hub.
  *
+ * Named proxy, not middleware: Next 16 renamed the convention (the "middleware"
+ * file convention is deprecated) and the exported function must match the file.
+ *
  * Redirects unauthenticated requests to /login BEFORE any page renders,
  * preventing a flash of the dashboard on a fresh session. This gate is a UX
  * courtesy — the REAL auth is the Sanctum Bearer token (stored in
@@ -14,12 +17,12 @@ import { NextResponse, type NextRequest } from 'next/server';
  * dot-separated parts, and a payload that parses. A forged `qhs_session=1`
  * no longer gets past this line, which is what this gate is for.
  *
- * What is NOT checked here is the signature. Middleware runs on the Edge
+ * What is NOT checked here is the signature. This file runs on the Edge
  * runtime, which has no `node:crypto`, so HMAC-SHA256 verification would have
  * to be reimplemented against Web Crypto — duplicated logic in a second
  * runtime, for a gate that is not the boundary. The routes that do protect
  * something (the camera proxy) verify the signature properly, in
- * src/lib/camera-session.ts, on the Node runtime. Read a middleware "pass" as
+ * src/lib/camera-session.ts, on the Node runtime. Read a "pass" here as
  * "render the shell", never as "this visitor is authenticated".
  *
  * Public paths (no auth required): /login, all /api/* routes, and static
@@ -32,7 +35,7 @@ import { NextResponse, type NextRequest } from 'next/server';
  */
 const PUBLIC_ASSET = /\.(?:png|jpe?g|gif|webp|svg|ico|css|js|mjs|map|json|txt|xml|webmanifest|woff2?)$/i;
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Always allow the login page, backend-facing API routes, and static files.

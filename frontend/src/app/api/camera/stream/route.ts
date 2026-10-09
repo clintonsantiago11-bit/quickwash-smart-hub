@@ -16,7 +16,36 @@ export const maxDuration = 300;
 // The camera lives on the wash-bay LAN, so the upstream URL is an env var:
 // set CAMERA_STREAM_URL when the frontend runs on the LAN too (cloud hosts
 // cannot reach the LAN IP, so the feed stays "offline" there by design).
+//
+// CAMERA_RELAY_URL is the alternative: the iot-bridge agent reached through a
+// tunnel, which is how the stream works from the cloud. The bridge requires
+// BRIDGE_API_KEY, because it is the only boundary in front of an ESP32-CAM that
+// authenticates nothing itself.
+//
+// That key is sent from here, server-side, and that is the whole reason this
+// indirection exists. The browser must never hold it: a NEXT_PUBLIC_ variable
+// is inlined into the bundle and readable by anyone who opens the page, so the
+// dashboard fetches this route and never the relay directly. Falling back to
+// the camera when no relay is configured keeps a LAN-only install working with
+// nothing set.
+// Absent in a cloud build unless set, which is exactly right: the UI reads
+// NEXT_PUBLIC_CAMERA_RELAY_URL purely as a yes/no marker so it can say whether
+// a relay is meant to be reachable at all.
+const CAMERA_RELAY_URL = (process.env.CAMERA_RELAY_URL || '').replace(/\/+$/, '');
+const CAMERA_RELAY_KEY = process.env.CAMERA_RELAY_KEY || '';
+
 const CAMERA_STREAM_URL = process.env.CAMERA_STREAM_URL || 'http://192.168.1.7:81/stream';
+
+/** Resolve where the bytes actually come from, and with what credential. */
+function upstreamFor(): { target: string; headers: Record<string, string> } {
+  if (!CAMERA_RELAY_URL) {
+    return { target: CAMERA_STREAM_URL, headers: {} };
+  }
+  return {
+    target: `${CAMERA_RELAY_URL}/camera/stream`,
+    headers: { 'x-api-key': CAMERA_RELAY_KEY },
+  };
+}
 
 type ActiveStream = {
   abort: () => void;
@@ -77,12 +106,24 @@ export async function GET(request: Request) {
   activeStreams.add(conn);
 
   try {
-    const upstream = await fetch(CAMERA_STREAM_URL, {
+    const { target, headers } = upstreamFor();
+    const upstream = await fetch(target, {
       cache: 'no-store',
       signal: upstreamAbort.signal,
-      headers: { Connection: 'keep-alive' },
+      headers: { Connection: 'keep-alive', ...headers },
     });
     clearTimeout(headerTimeout);
+
+    if (upstream.status === 401) {
+      // The relay refused our key. Surface that as a configuration fault rather
+      // than an empty player, because the usual cause is a mismatch between
+      // CAMERA_RELAY_KEY here and BRIDGE_API_KEY on the bridge.
+      activeStreams.delete(conn);
+      return new Response(
+        'The camera relay rejected this deployment’s credentials. Check CAMERA_RELAY_KEY on the frontend against BRIDGE_API_KEY on the IoT bridge.',
+        { status: 502 },
+      );
+    }
 
     if (!upstream.body) {
       activeStreams.delete(conn);

@@ -27,21 +27,29 @@ interface HardwareUpdate {
 const CAMERA_CONTROL_URL = process.env.NEXT_PUBLIC_CAMERA_CONTROL_URL || 'http://192.168.1.7/';
 
 /**
- * Where the MJPEG stream is fetched from.
+ * The stream is always fetched from this app's own origin.
  *
- * The camera sits on the wash-bay LAN, so the app's own /api/camera proxy
- * runs in the cloud and gets refused. Two ways round that:
+ * It used to point straight at the IoT bridge when NEXT_PUBLIC_CAMERA_RELAY_URL
+ * was set. That cannot be authenticated: a NEXT_PUBLIC_ value is inlined into
+ * the browser bundle, so any key sent to the relay would be readable by anyone
+ * who opens the page, and the bridge now requires one. The relay is therefore
+ * contacted server-side by /api/camera/stream, which holds the credential.
  *
- *  - NEXT_PUBLIC_CAMERA_RELAY_URL points at the IoT bridge exposed publicly
- *    (Cloudflare Tunnel, ngrok, port forward). The bridge is on the LAN and
- *    relays the stream. This is the one that works.
- *  - Otherwise fall back to the in-app proxy, which is only reachable when
- *    the frontend itself runs on the same LAN.
+ * The browser gains nothing by talking to the relay itself, so it does not.
  */
-const CAMERA_RELAY_URL = process.env.NEXT_PUBLIC_CAMERA_RELAY_URL || '';
-const STREAM_URL = CAMERA_RELAY_URL
-  ? `${CAMERA_RELAY_URL.replace(/\/+$/, '')}/camera/stream`
-  : '/api/camera/stream';
+const STREAM_URL = '/api/camera/stream';
+
+/**
+ * True once this deployment is configured to reach the camera at all.
+ *
+ * Read from NEXT_PUBLIC_CAMERA_RELAY_URL purely as a yes/no marker for which
+ * message to show. The URL itself is never used to build a request, and
+ * CAMERA_RELAY_URL (server-only, on /api/camera/stream) is what the proxy
+ * actually contacts.
+ */
+const RELAY_CONFIGURED = Boolean(
+  process.env.NEXT_PUBLIC_CAMERA_RELAY_URL || process.env.NEXT_PUBLIC_CAMERA_CONTROL_URL,
+);
 
 const initialCameras: CameraFeed[] = [
   { id: 'esp32_cam_1', name: 'Main Wash Bay', streamUrl: STREAM_URL, controlUrl: CAMERA_CONTROL_URL, status: 'offline' },
@@ -253,9 +261,9 @@ export default function CamerasPage() {
                             copy suggested checking the power supply and the
                             ribbon cable, which sends an operator looking for
                             a fault that is not there. */}
-                        {CAMERA_RELAY_URL
-                          ? 'The camera did not answer through the IoT bridge. Check the bridge is running on the wash-bay PC and that the camera is powered.'
-                          : 'This site cannot reach the camera. It sits on the wash-bay network, which the deployed site has no route to. Set NEXT_PUBLIC_CAMERA_RELAY_URL to the IoT bridge exposed publicly, and it will relay the video.'}
+                        {RELAY_CONFIGURED
+                          ? 'The camera did not answer through the IoT bridge. Check the bridge is running on the wash-bay PC, that CAMERA_RELAY_KEY matches its BRIDGE_API_KEY, and that the camera is powered.'
+                          : 'This site cannot reach the camera. It sits on the wash-bay network, which the deployed site has no route to. Set CAMERA_RELAY_URL on the frontend (and BRIDGE_API_KEY on the bridge) to route the stream through the IoT bridge.'}
                       </p>
                       <p className="text-[10px] lg:text-xs mt-2 leading-relaxed font-bold opacity-40" style={{ color: 'var(--text-secondary)' }}>
                         Camera on the bay network: {CAMERA_CONTROL_URL} (auto-retrying every 10s)

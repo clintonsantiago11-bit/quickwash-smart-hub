@@ -127,7 +127,7 @@ class AuthController extends Controller
         $user->forceFill(['last_login_at' => Carbon::now()])->save();
 
         // Mirror the token into an HttpOnly cookie so the Next.js server-side
-        // middleware (src/middleware.ts) can gate protected pages before they
+        // proxy (src/proxy.ts) can gate protected pages before they
         // render — and so the session survives a page refresh without the
         // token ever being readable by client-side JS. SameSite=Lax + host-only
         // means localhost:8000 and localhost:3000 (same site, different ports)
