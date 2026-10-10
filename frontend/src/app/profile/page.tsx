@@ -12,7 +12,8 @@ import { useUI } from '@/providers/UIProvider';
 import {
   activityLabel, fieldErrorsFrom, initials, isDirty, isPasswordComplete,
   passwordProblems, passwordStrength, relativeTime, roleLabel, toDraft,
-  toPayload, memberSince, toProfile, validateAvatar, validateDraft,
+  toPayload, memberSince, toProfile, validateAvatar, validateAvatarContent,
+  validateDraft,
   type ActivityEntry, type FieldErrors, type Profile, type ProfileDraft,
 } from '@/lib/profile';
 
@@ -191,7 +192,9 @@ export default function ProfilePage() {
     event.preventDefault();
     if (changingPassword) return;
 
-    if (!isPasswordComplete(newPassword, confirmPassword)) {
+    // The current password is passed through so the same-as-before rule is checked
+    // here rather than coming back as a 422 after the round trip.
+    if (!isPasswordComplete(newPassword, confirmPassword, currentPassword)) {
       setPasswordErrors({ password: 'Your new password does not meet the requirements yet.' });
       return;
     }
@@ -234,9 +237,17 @@ export default function ProfilePage() {
     event.target.value = '';
     if (!file) return;
 
+    // Cheap checks first (type, size), then the byte signature. The declared
+    // MIME type is attacker-supplied, so it cannot be the only gate.
     const problem = validateAvatar(file);
     if (problem) {
       showBanner({ kind: 'error', text: problem });
+      return;
+    }
+
+    const contentProblem = await validateAvatarContent(file);
+    if (contentProblem) {
+      showBanner({ kind: 'error', text: contentProblem });
       return;
     }
 
@@ -573,7 +584,7 @@ export default function ProfilePage() {
                       />
                     </div>
                     <ul id="password-requirements" className="space-y-1 text-[var(--text-muted)]">
-                      {passwordProblems(newPassword, confirmPassword).map((problem) => (
+                      {passwordProblems(newPassword, confirmPassword, currentPassword).map((problem) => (
                         <li key={problem}>Needs: {problem}</li>
                       ))}
                     </ul>
@@ -583,7 +594,7 @@ export default function ProfilePage() {
                 <button
                   type="submit"
                   className="btn btn-primary flex w-full items-center justify-center gap-2 py-3 text-xs font-black uppercase tracking-widest"
-                  disabled={changingPassword || !isPasswordComplete(newPassword, confirmPassword) || currentPassword.length === 0}
+                  disabled={changingPassword || !isPasswordComplete(newPassword, confirmPassword, currentPassword) || currentPassword.length === 0}
                 >
                   {changingPassword ? <Loader2 size={14} className="animate-spin" /> : <KeyRound size={14} />}
                   {changingPassword ? 'Changing' : 'Change password'}

@@ -7,9 +7,11 @@ import {
   initials,
   isDirty,
   LIMITS,
+  looksLikeImage,
   memberSince,
   isPasswordComplete,
   MAX_AVATAR_BYTES,
+  MAX_PASSWORD_LENGTH,
   passwordProblems,
   passwordStrength,
   relativeTime,
@@ -18,6 +20,7 @@ import {
   toPayload,
   toProfile,
   validateAvatar,
+  validateAvatarContent,
   validateDraft,
 } from './profile.ts';
 
@@ -212,6 +215,124 @@ test('values at the limit are still accepted', () => {
   });
   assert.deepEqual(ok, {}, JSON.stringify(ok));
   assert.ok('+63 1234567890'.length <= LIMITS.phone.max);
+});
+
+/* ---- avatar ---- */
+
+/**
+ * `file.type` is whatever the browser reported, and is trivially spoofed: a
+ * renamed executable passed the type check before the signature check existed.
+ *
+ * This is a convenience layer, not the control. The server re-validates, and
+ * Laravel's `mimes` rule reads the real bytes through finfo - verified by
+ * tracing validateImage -> validateMimes -> guessExtension ->
+ * FileinfoMimeTypeGuesser. The client check exists so the operator gets an
+ * immediate answer instead of a round trip and a 422.
+ */
+
+const bytes = (...b) => new Uint8Array(b);
+const asFile = (bytes_, name, type) => new File([bytes_], name, { type });
+
+const SIGNATURES = [
+  ['JPEG', bytes(0xff, 0xd8, 0xff, 0xe0, 0, 0, 0, 0)],
+  ['PNG', bytes(0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a)],
+  // RIFF at 0, a 4-byte size, WEBP at 8.
+  ['WebP', bytes(0x52, 0x49, 0x46, 0x46, 0, 0, 0, 0, 0x57, 0x45, 0x42, 0x50)],
+];
+
+test('a real image signature is recognised', () => {
+  for (const [label, sig] of SIGNATURES) {
+    assert.equal(looksLikeImage(sig), true, `${label} must be recognised`);
+  }
+});
+
+test('a non-image with an image filename is not', () => {
+  // Each of these is the shape of a real attack: a file whose extension and
+  // declared type say "image" and whose bytes say otherwise.
+  const impostors = [
+    ['PE executable', bytes(0x4d, 0x5a, 0x90, 0x00, 0x03)],
+    ['GIF89a', bytes(0x47, 0x49, 0x46, 0x38, 0x39, 0x61)],
+    ['HTML', bytes(0x3c, 0x68, 0x74, 0x6d, 0x6c)],
+    ['plain text', bytes(0x68, 0x65, 0x6c, 0x6c, 0x6f)],
+    ['empty', bytes()],
+    ['RIFF that is not WEBP (WAV)', bytes(0x52, 0x49, 0x46, 0x46, 0, 0, 0, 0, 0x57, 0x41, 0x56, 0x43)],
+  ];
+
+  for (const [label, b] of impostors) {
+    assert.equal(looksLikeImage(b), false, `${label} must not pass`);
+  }
+});
+
+test('the renamed executable is rejected by the content check', async () => {
+  const exe = asFile(
+    bytes(0x4d, 0x5a, 0x90, 0x00, 0x03),
+    'photo.png',
+    'image/png'
+  );
+
+  // Passes the declared-type and size checks...
+  assert.equal(validateAvatar(exe), null, 'type and size alone do not catch this');
+  // ...and is stopped by the bytes.
+  assert.match((await validateAvatarContent(exe)) ?? '', /not a JPG/i);
+});
+
+test('a genuine image passes both checks', async () => {
+  const png = asFile(SIGNATURES[1][1], 'photo.png', 'image/png');
+  assert.equal(validateAvatar(png), null);
+  assert.equal(await validateAvatarContent(png), null);
+});
+
+test('an empty file is rejected before the signature check', () => {
+  const empty = asFile(bytes(), 'photo.png', 'image/png');
+  assert.match(validateAvatar(empty) ?? '', /empty/i);
+});
+
+/* ---- password ---- */
+
+test('a password over the server ceiling is caught client-side', () => {
+  // ChangePasswordRequest sets max:200. The old check had no ceiling at all,
+  // so a 201-character password passed and came back as a 422.
+  const tooLong = 'A1' + 'a'.repeat(MAX_PASSWORD_LENGTH - 1);
+  assert.equal(tooLong.length, MAX_PASSWORD_LENGTH + 1);
+  assert.equal(isPasswordComplete(tooLong, tooLong), false);
+  assert.match(passwordProblems(tooLong, tooLong).join(' '), /No more than 200/);
+});
+
+test('a password at exactly the ceiling is accepted', () => {
+  // 'A1' plus (200 - 3) filler characters is 200 long; subtracting 2 was an
+  // off-by-one that made this test assert the wrong boundary.
+  const atLimit = 'A1' + 'a'.repeat(MAX_PASSWORD_LENGTH - 2);
+  assert.equal(atLimit.length, MAX_PASSWORD_LENGTH);
+  assert.equal(isPasswordComplete(atLimit, atLimit), true);
+});
+
+test('reusing the current password is caught before the round trip', () => {
+  // ChangePasswordRequest enforces different:current_password. The helper
+  // could not check it before because it was never given the current value.
+  assert.equal(isPasswordComplete('admin123', 'admin123', 'admin123'), false);
+  assert.match(
+    passwordProblems('admin123', 'admin123', 'admin123').join(' '),
+    /Different from the current password/
+  );
+});
+
+test('a different password still passes when the current one is known', () => {
+  assert.equal(isPasswordComplete('NewPassw0rd', 'NewPassw0rd', 'admin123'), true);
+});
+
+test('the profile page passes the current password into both checks', () => {
+  const page = readFileSync(new URL('../app/profile/page.tsx', import.meta.url), 'utf8');
+  const calls = [...page.matchAll(/isPasswordComplete\(([^)]*)\)/g)].map((m) => m[1]);
+
+  assert.ok(calls.length >= 2, 'the check is used in more than one place');
+  for (const args of calls) {
+    assert.match(
+      args,
+      /currentPassword/,
+      `isPasswordComplete(${args}) must receive currentPassword or it cannot enforce different:current_password`,
+    );
+  }
+  assert.match(page, /passwordProblems\(newPassword, confirmPassword, currentPassword\)/);
 });
 
 test('designation is still clearable and still validated', () => {

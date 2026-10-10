@@ -152,19 +152,47 @@ export function validateDraft(draft: ProfileDraft): FieldErrors {
 const PHONE_RULES = /^[0-9+()\-.\s]+$/;
 const EMAIL_RULES = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-/** Mirrors ChangePasswordRequest: 8+ chars with upper, lower and a digit. */
-export function passwordProblems(pw: string, confirm: string): string[] {
+/**
+ * Mirrors ChangePasswordRequest: 8+ chars with upper, lower and a digit.
+ *
+ * `current` enables the `different:current_password` check, which the server
+ * enforces. Without it the operator submits, waits, and is told the new
+ * password is the one they just replaced.
+ */
+export function passwordProblems(pw: string, confirm: string, current?: string): string[] {
   const problems: string[] = [];
   if (pw.length < 8) problems.push('At least 8 characters');
+  if (pw.length > MAX_PASSWORD_LENGTH) problems.push(`No more than ${MAX_PASSWORD_LENGTH} characters`);
   if (!/[A-Z]/.test(pw)) problems.push('An uppercase letter');
   if (!/[a-z]/.test(pw)) problems.push('A lowercase letter');
   if (!/[0-9]/.test(pw)) problems.push('A number');
   if (confirm.length > 0 && pw !== confirm) problems.push('The two entries match');
+  if (current !== undefined && pw.length > 0 && pw === current) problems.push('Different from the current password');
   return problems;
 }
 
-export function isPasswordComplete(pw: string, confirm: string): boolean {
-  return pw.length >= 8 && pw === confirm && /[A-Z]/.test(pw) && /[a-z]/.test(pw) && /[0-9]/.test(pw);
+/** Mirrors the max:200 ceiling on ChangePasswordRequest. */
+export const MAX_PASSWORD_LENGTH = 200;
+
+/**
+ * Mirrors ChangePasswordRequest: min 8, confirmed, upper + lower + digit, and
+ * different from the one being replaced.
+ *
+ * `current` is optional because the caller may not want to hold the old value.
+ * When supplied, the `different:current_password` rule is checked here too, so
+ * the operator is told before the round trip rather than after it.
+ */
+export function isPasswordComplete(
+  pw: string,
+  confirm: string,
+  current?: string,
+): boolean {
+  if (pw.length < 8) return false;
+  if (pw.length > MAX_PASSWORD_LENGTH) return false;
+  if (pw !== confirm) return false;
+  if (!/[A-Z]/.test(pw) || !/[a-z]/.test(pw) || !/[0-9]/.test(pw)) return false;
+  if (current !== undefined && pw === current) return false;
+  return true;
 }
 
 export interface PasswordStrength {
@@ -196,10 +224,69 @@ export function passwordStrength(pw: string): PasswordStrength {
 export const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
 export const AVATAR_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
-/** Rejects an oversized or wrong-typed avatar before the upload starts. */
+/**
+ * Magic-byte signatures for the three accepted formats.
+ *
+ * `file.type` is whatever the browser reported and is trivially spoofed - a
+ * renamed executable passes the check below on type alone. Sniffing the first
+ * few bytes catches that before the upload starts.
+ *
+ * This is a convenience check, not the control. The server re-validates, and
+ * Laravel's `mimes` rule reads the real bytes through symfony/mime's
+ * FileinfoMimeTypeGuesser (finfo), so a spoofed type is rejected there too. This
+ * exists so the operator gets an immediate answer rather than a round trip and
+ * a 422.
+ */
+const RIFF = [0x52, 0x49, 0x46, 0x46]; // "RIFF"
+const WEBP = [0x57, 0x45, 0x42, 0x50]; // "WEBP"
+
+function matchesAt(bytes: ArrayLike<number>, sig: number[], offset: number): boolean {
+  if (bytes.length < offset + sig.length) return false;
+  for (let i = 0; i < sig.length; i++) {
+    if (bytes[offset + i] !== sig[i]) return false;
+  }
+  return true;
+}
+
+/** True when the leading bytes match a known image signature. */
+export function looksLikeImage(bytes: ArrayLike<number>): boolean {
+  // JPEG: SOI marker followed by a third start-of-marker byte.
+  if (matchesAt(bytes, [0xff, 0xd8, 0xff], 0)) return true;
+
+  // PNG: the full 8-byte signature is distinctive; 4 alone is fine but 8 is
+  // safer and costs nothing.
+  if (matchesAt(bytes, [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a], 0)) return true;
+
+  // WebP is a RIFF container, so the magic is split: "RIFF" at the start and
+  // "WEBP" as the form type at offset 8, with a 4-byte size field between.
+  if (matchesAt(bytes, RIFF, 0) && matchesAt(bytes, WEBP, 8)) return true;
+
+  return false;
+}
+
+/** Reads the first 16 bytes of a File, which covers every signature above. */
+export async function readMagicBytes(file: Blob): Promise<Uint8Array> {
+  const head = await file.slice(0, 16).arrayBuffer();
+  return new Uint8Array(head);
+}
+
+/**
+ * Rejects an oversized, wrong-typed, or byte-mismatched avatar before the
+ * upload starts. Size and type are checked first because they are free.
+ */
 export function validateAvatar(file: File): string | null {
   if (!AVATAR_TYPES.includes(file.type)) return 'Use a JPG, PNG or WebP image.';
   if (file.size > MAX_AVATAR_BYTES) return 'Choose an image under 2 MB.';
+  if (file.size === 0) return 'That file is empty.';
+  return null;
+}
+
+/** The content-based half of the check, which needs the bytes. */
+export async function validateAvatarContent(file: File): Promise<string | null> {
+  const head = await readMagicBytes(file);
+  if (!looksLikeImage(head)) {
+    return 'That file is not a JPG, PNG or WebP image.';
+  }
   return null;
 }
 
