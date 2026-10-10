@@ -93,6 +93,20 @@ export function isDirty(draft: ProfileDraft, saved: ProfileDraft): boolean {
 }
 
 /**
+ * Length ceilings, matching UpdateProfileRequest on the server.
+ *
+ * Without these, a value longer than the column allows passed the browser
+ * checks and came back as a 422 with the message buried in a generic banner
+ * rather than shown beside the field that caused it.
+ */
+export const LIMITS = {
+  full_name: { min: 2, max: 100 },
+  email: { max: 100 },
+  phone: { max: 20 },
+  designation: { max: 100 },
+} as const;
+
+/**
  * Client-side mirror of the server's UpdateProfileRequest rules, so an
  * obvious typo is caught before a round trip. The server stays the
  * authority — this never replaces it.
@@ -102,11 +116,35 @@ export function validateDraft(draft: ProfileDraft): FieldErrors {
   const fullName = draft.full_name.trim();
   const email = draft.email.trim();
   const phone = draft.phone.trim();
+  const designation = draft.designation.trim();
 
-  if (fullName.length < 2) errors.full_name = 'Enter your full name.';
-  if (!email) errors.email = 'Enter your email address.';
-  else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errors.email = 'Enter a valid email address.';
-  if (phone && !/^[0-9+()\-.\s]+$/.test(phone)) errors.phone = 'Enter a valid phone number.';
+  if (fullName.length < LIMITS.full_name.min) {
+    errors.full_name = 'Enter your full name.';
+  } else if (fullName.length > LIMITS.full_name.max) {
+    errors.full_name = `Keep it under ${LIMITS.full_name.max} characters.`;
+  }
+
+  if (!email) {
+    errors.email = 'Enter your email address.';
+  } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    errors.email = 'Enter a valid email address.';
+  } else if (email.length > LIMITS.email.max) {
+    errors.email = `Keep it under ${LIMITS.email.max} characters.`;
+  }
+
+  if (phone) {
+    if (!/^[0-9+()\-.\s]+$/.test(phone)) {
+      errors.phone = 'Enter a valid phone number.';
+    } else if (phone.length > LIMITS.phone.max) {
+      errors.phone = `Keep it under ${LIMITS.phone.max} characters.`;
+    }
+  }
+
+  // designaion is NOT NULL in the database with a column default, so it has
+  // always been clearable, but the length ceiling was never checked here.
+  if (designation.length > LIMITS.designation.max) {
+    errors.designation = `Keep it under ${LIMITS.designation.max} characters.`;
+  }
 
   return errors;
 }

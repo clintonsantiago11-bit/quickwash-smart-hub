@@ -1,10 +1,12 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { readFileSync } from 'node:fs';
 import {
   activityLabel,
   fieldErrorsFrom,
   initials,
   isDirty,
+  LIMITS,
   memberSince,
   isPasswordComplete,
   MAX_AVATAR_BYTES,
@@ -148,4 +150,72 @@ test('a Laravel 422 becomes one readable message per field', () => {
   assert.equal(errors.phone, undefined, 'an empty message list is dropped');
   assert.deepEqual(fieldErrorsFrom(new Error('network')), {});
   assert.deepEqual(fieldErrorsFrom(null), {});
+});
+
+/**
+ * fieldErrorsFrom reads `error.body`, so the throw site has to provide it.
+ *
+ * api.ts attached only `status`, so every validation failure collapsed into one
+ * generic banner with no field marked - the helper existed, looked correct, and
+ * was always handed undefined. Verified by running both halves: a thrown error
+ * with status but no body yields {}.
+ */
+test('the error api.ts throws carries the 422 body, not just the status', async () => {
+  const apiSource = readFileSync(new URL('./api.ts', import.meta.url), 'utf8');
+
+  // Find the throw that follows the !res.ok branch, rather than asserting on a
+// fixed character window - the comments around it move and would make the
+// window a fragile thing to maintain.
+const branchStart = apiSource.indexOf('if (!res.ok)');
+const throwStatement = apiSource
+    .slice(branchStart)
+    .match(/throw[\s\S]*?;/)?.[0] ?? '';
+
+assert.match(
+  throwStatement,
+  /throw Object\.assign\(\s*new Error\(message\),\s*\{[^}]*\bbody\b/,
+  'the thrown error must carry body, or fieldErrorsFrom can never read a 422',
+);
+assert.match(
+  throwStatement,
+  /status: res\.status/,
+  'the status must still be carried so callers can tell 403 from 500',
+);
+});
+
+test('a length that the server would reject is caught before the round trip', () => {
+  // These mirror UpdateProfileRequest. Each of these passed validation before
+  // the ceilings were added and returned a 422.
+  const over = (patch) => ({ full_name: 'Ana Reyes', email: 'ana@example.com', phone: '', designation: '', ...patch });
+
+  const longPhone = validateDraft(over({ phone: '+63 1234567890123456789' }));
+  assert.match(longPhone.phone ?? '', /20/, 'a phone over 20 characters must be rejected');
+
+  const longName = validateDraft(over({ full_name: 'x'.repeat(101) }));
+  assert.ok(longName.full_name, 'a name over 100 characters must be rejected');
+
+  const longEmail = validateDraft(over({ email: 'a'.repeat(95) + '@example.com' }));
+  assert.ok(longEmail.email, 'an email over 100 characters must be rejected');
+
+  const longDesignation = validateDraft(over({ designation: 'd'.repeat(101) }));
+  assert.ok(longDesignation.designation, 'a designation over 100 characters must be rejected');
+});
+
+test('values at the limit are still accepted', () => {
+  // An off-by-one here would block a legitimate edit, which is worse than the
+  // 422 it was meant to avoid.
+  const ok = validateDraft({
+    full_name: 'x'.repeat(LIMITS.full_name.max),
+    email: 'a'.repeat(LIMITS.email.max - 13) + '@example.com',
+    phone: '+63 1234567890',
+    designation: 'd'.repeat(LIMITS.designation.max),
+  });
+  assert.deepEqual(ok, {}, JSON.stringify(ok));
+  assert.ok('+63 1234567890'.length <= LIMITS.phone.max);
+});
+
+test('designation is still clearable and still validated', () => {
+  const base = { full_name: 'Ana Reyes', email: 'ana@example.com', phone: '' };
+  assert.deepEqual(validateDraft({ ...base, designation: '' }), {});
+  assert.ok(validateDraft({ ...base, designation: 'd'.repeat(101) }).designation);
 });

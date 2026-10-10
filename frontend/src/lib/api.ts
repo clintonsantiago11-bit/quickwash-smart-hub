@@ -269,14 +269,20 @@ class ApiClient {
       throw new Error('Unauthorized');
     }
 
-    if (!res.ok) {
-      const errBody = body as { message?: string; error?: string } | null;
-      const message = errBody?.message || errBody?.error || `Request failed (${res.status})`;
-      // Carry the status so a caller can tell "you may not see this" (403)
-      // apart from "this is broken" (500). Without it the audit page could
-      // only guess, and showed a blank table to anyone who is not an admin.
-      throw Object.assign(new Error(message), { status: res.status });
-    }
+if (!res.ok) {
+        const errBody = body as { message?: string; error?: string } | null;
+        const message = errBody?.message || errBody?.error || `Request failed (${res.status})`;
+        // Carry the status so a caller can tell "you may not see this" (403)
+        // apart from "this is broken" (500). Without it the audit page could
+        // only guess, and showed a blank table to anyone who is not an admin.
+        //
+        // `body` has to come along too. A 422 from Laravel carries a per-field
+        // `errors` map, and fieldErrorsFrom() reads it to put the message beside
+        // the offending input. Throwing the status alone meant that helper
+        // always got undefined and every validation failure collapsed into one
+        // generic "we could not save" banner with no field marked.
+        throw Object.assign(new Error(message), { status: res.status, body });
+      }
 
     return body;
   }

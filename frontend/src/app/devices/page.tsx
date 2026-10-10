@@ -26,14 +26,23 @@ export default function DevicesPage() {
   const [devices, setDevices] = useState(defaultDevices);
   const [onlineCount, setOnlineCount] = useState(0);
   const [sendingId, setSendingId] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState('');
+
+  // Device commands are role-gated server-side (role:admin,manager on
+  // /devices/{device}/command). Hiding the button for a technician saves them
+  // clicking into a 403 they cannot act on.
+  const [canCommand, setCanCommand] = useState(true);
+  const [commandError, setCommandError] = useState('');
 
   const fetchDevices = async () => {
     try {
       const data = await api.getDevices();
       setDevices(data);
       setOnlineCount(data.filter((d: DeviceItem) => d.status === 'online').length);
+      setLoadError('');
     } catch {
       console.warn('Devices backend unavailable');
+      setLoadError('The device list could not be loaded. Check the connection and try again.');
     }
   };
 
@@ -47,21 +56,54 @@ export default function DevicesPage() {
   usePolling(() => void fetchDevices(), { everyMs: 15000, jitterMs: 3000 });
 
 
+// The signed-in role decides whether the controls are shown at all. Reading
+  // the profile is one extra request, but it is the only way the UI knows what
+  // the API will allow before the operator clicks.
+  useEffect(() => {
+    api
+      .getProfile()
+      .then((user) => setCanCommand(user.role === 'admin' || user.role === 'manager'))
+      .catch(() => setCanCommand(true));
+  }, []);
+
   const handleRestart = async (deviceId: string) => {
     setSendingId(deviceId);
+    setCommandError('');
     try {
       await api.sendCommand(deviceId, 'reset_jam');
     } catch (err) {
       console.warn('Failed to send command:', err);
+      const status = (err as { status?: number })?.status;
+      // A 502 means the command was published to MQTT but the broker would not
+      // confirm it, so it may or may not have reached the hardware. Saying
+      // "failed" would be a lie in the other direction, so both are reported as
+      // "not confirmed".
+      setCommandError(
+        status === 502
+          ? 'The command could not be confirmed. The hardware may not have received it.'
+          : 'The command could not be sent.',
+      );
     }
     setSendingId(null);
   };
 
-  return (
+return (
     <>
       <Header title="Device Fleet" subtitle="Manage IoT hardware nodes" />
       <main className="flex-1 p-3 sm:p-4 md:p-6 space-y-6 max-w-[1600px] mx-auto w-full">
-        
+
+        {loadError && (
+          <div className="card p-4 flex items-center gap-3" role="alert" style={{ borderColor: 'rgba(239,68,68,0.5)' }}>
+            <p className="text-sm" style={{ color: 'var(--danger)' }}>{loadError}</p>
+          </div>
+        )}
+
+        {commandError && (
+          <div className="card p-4 flex items-center gap-3" role="alert" style={{ borderColor: 'rgba(239,68,68,0.5)' }}>
+            <p className="text-sm" style={{ color: 'var(--danger)' }}>{commandError}</p>
+          </div>
+        )}
+
         {/* Device KPIs */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="card p-5 flex items-center gap-4">
@@ -118,14 +160,22 @@ export default function DevicesPage() {
                 </div>
               </div>
 
-              <div className="mt-8 pt-4 flex gap-2 sm:gap-3" style={{ borderTop: '1px solid var(--border)' }}>
-                <button
-                  onClick={() => handleRestart(device.id)}
-                  disabled={sendingId === device.id}
-                  className="btn btn-ghost flex-1 py-2 text-[10px] sm:text-xs lg:text-sm font-bold uppercase tracking-wider flex items-center justify-center gap-2 hover:bg-[var(--bg-hover)] disabled:opacity-50"
-                >
-                  <RefreshCw size={14} className={sendingId === device.id ? 'animate-spin' : ''} /> <span>{sendingId === device.id ? 'Sending' : 'Reset Jam'}</span>
-                </button>
+<div className="mt-8 pt-4 flex gap-2 sm:gap-3" style={{ borderTop: '1px solid var(--border)' }}>
+                {canCommand ? (
+                  <button
+                    onClick={() => handleRestart(device.id)}
+                    disabled={sendingId === device.id}
+                    className="btn btn-ghost flex-1 py-2 text-[10px] sm:text-xs lg:text-sm font-bold uppercase tracking-wider flex items-center justify-center gap-2 hover:bg-[var(--bg-hover)] disabled:opacity-50"
+                  >
+                    <RefreshCw size={14} className={sendingId === device.id ? 'animate-spin' : ''} /> <span>{sendingId === device.id ? 'Sending' : 'Reset Jam'}</span>
+                  </button>
+                ) : (
+                  // Replaced rather than disabled: a greyed-out control with no
+                  // explanation reads as a broken page.
+                  <p className="flex-1 text-[10px] sm:text-xs opacity-50 text-center py-2 uppercase tracking-wider">
+                    Resetting a jam needs an admin or manager account
+                  </p>
+                )}
                 <button className="btn btn-ghost flex-1 py-2 text-[10px] sm:text-xs lg:text-sm font-bold uppercase tracking-wider flex items-center justify-center gap-2 hover:bg-[var(--bg-hover)]">
                   <Activity size={14} /> <span>Logs</span>
                 </button>
