@@ -54,6 +54,8 @@
             "advisories": {
                 "block": false
             }
+        },
+        "platform": {
         }
     },
     "minimum-stability": "stable",
@@ -61,6 +63,6 @@
     "repositories": [{
         "name": "packagist",
         "type": "composer",
-        "url": "https://mirrors.aliyun.com/composer/"
+        "url": "https://packagist.org/"
     }]
 }
