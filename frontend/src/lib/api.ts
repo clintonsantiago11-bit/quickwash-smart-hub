@@ -67,7 +67,7 @@ async function revokeSessionCookie(): Promise<void> {
 }
 
 /** Typed login failures for actionable form feedback. */
-export type LoginErrorKind = 'credentials' | 'network' | 'timeout' | 'server';
+export type LoginErrorKind = 'credentials' | 'network' | 'timeout' | 'server' | 'locked' | 'throttled';
 
 const TOKEN_KEY = 'auth_token';
 const AUTH_FLAG_KEY = 'isAuthenticated';
@@ -342,6 +342,15 @@ if (!res.ok) {
       }
       if (msg.includes('Network error')) {
         throw new LoginError('network', 'No signal — the hub is unreachable.');
+      }
+      // The API locks an email+IP pair after repeated failures and throttles
+      // the login route. Both are distinct from a wrong password, so surface
+      // the server's own message instead of the generic credentials copy.
+      if (/too many failed attempts|try again in \d+ minute/i.test(msg)) {
+        throw new LoginError('locked', msg);
+      }
+      if (/too many attempts|throttle/i.test(msg)) {
+        throw new LoginError('throttled', msg);
       }
       // Laravel reports bad credentials as 422 with this message; 401 covers Sanctum-style rejections.
       if (/credential|incorrect|unauthorized|invalid|password/i.test(msg)) {

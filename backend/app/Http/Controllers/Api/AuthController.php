@@ -181,7 +181,15 @@ class AuthController extends Controller
         // share it. Lifetime matches the Sanctum token expiry.
         $cookieMinutes = (int) config('sanctum.expiration', 480);
         $cookie = cookie(
-            'auth_token', $token, $cookieMinutes, '/', null, null, true, 'lax'
+            name: 'auth_token',
+            value: $token,
+            minutes: $cookieMinutes,
+            path: '/',
+            domain: null,
+            secure: $request->isSecure(),
+            httpOnly: true,
+            raw: false,
+            sameSite: 'lax',
         );
 
         return response()->json([

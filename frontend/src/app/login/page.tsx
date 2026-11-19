@@ -29,6 +29,8 @@ const failureMessages: Record<LoginErrorKind, string> = {
   timeout: 'The server took too long to respond. Wait a moment, then try again.',
   credentials: 'That email and password do not match. Check them and try again.',
   server: 'Sign in is temporarily unavailable. Try again in a moment.',
+  locked: 'Too many failed sign-in attempts. Wait a few minutes, then try again.',
+  throttled: 'Too many attempts in a short time. Wait a minute, then try again.',
 };
 
 export default function LoginPage() {
@@ -69,11 +71,15 @@ export default function LoginPage() {
 
       let auth: AuthResponse | null = null;
       let failure: LoginErrorKind = 'server';
+      let failureDetail = '';
 
       try {
         auth = (await api.login(credentials.email, credentials.password, credentials.keepSignedIn)) as AuthResponse;
       } catch (error) {
-        failure = error instanceof LoginError ? error.kind : 'server';
+        if (error instanceof LoginError) {
+          failure = error.kind;
+          failureDetail = error.message;
+        }
       }
 
       // A newer attempt superseded this one while the request was in flight.
@@ -105,7 +111,11 @@ export default function LoginPage() {
         return;
       }
 
-      setServerMessage(failureMessages[failure]);
+      setServerMessage(
+        failure === 'locked' || failure === 'throttled'
+          ? failureDetail || failureMessages[failure]
+          : failureMessages[failure]
+      );
       setPhase('failed');
     },
     [router]
