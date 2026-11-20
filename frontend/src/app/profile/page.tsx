@@ -1,6 +1,7 @@
 'use client';
 
 import Header from '@/components/Header';
+import AvatarDialog from '@/components/profile/AvatarDialog';
 import {
   Activity, Briefcase, Camera, Check, KeyRound, Loader2, Mail, MapPin,
   Phone, Save, ShieldCheck, User, X,
@@ -11,9 +12,7 @@ import { PageSkeleton } from '@/components/ui/Skeleton';
 import { useUI } from '@/providers/UIProvider';
 import {
   activityLabel, fieldErrorsFrom, initials, isDirty, isPasswordComplete,
-  passwordProblems, passwordStrength, relativeTime, roleLabel, toDraft,
-  toPayload, memberSince, toProfile, validateAvatar, validateAvatarContent,
-  validateDraft,
+  passwordProblems, passwordStrength, relativeTime, roleLabel, toDraft, toPayload,
   type ActivityEntry, type FieldErrors, type Profile, type ProfileDraft,
 } from '@/lib/profile';
 
@@ -25,11 +24,7 @@ const inputClass =
 function Field({
   id, label, icon: Icon, error, children,
 }: {
-  id: string;
-  label: string;
-  icon: typeof User;
-  error?: string;
-  children: React.ReactNode;
+  id: string; label: string; icon: typeof User; error?: string; children: React.ReactNode;
 }) {
   const errorId = `${id}-error`;
   return (
@@ -51,23 +46,19 @@ function Field({
 }
 
 function Section({
-  title, icon: Icon, action, children,
+  title, icon: Icon, children,
 }: {
-  title: string;
-  icon: typeof User;
-  action?: React.ReactNode;
-  children: React.ReactNode;
+  title: string; icon: typeof User; children: React.ReactNode;
 }) {
   return (
-    <section className="card p-6 lg:p-8">
-      <div className="mb-6 flex items-center justify-between gap-4">
-        <h3 className="flex items-center gap-2 font-display text-sm font-bold uppercase tracking-widest opacity-80">
-          <Icon size={18} className="text-[var(--accent)]" aria-hidden="true" />
+    <section className="card overflow-hidden">
+      <div className="border-b border-[var(--border)] px-6 py-4">
+        <h3 className="flex items-center gap-2 font-display text-xs font-bold uppercase tracking-widest opacity-80">
+          <Icon size={16} className="text-[var(--accent)]" aria-hidden="true" />
           {title}
         </h3>
-        {action}
       </div>
-      {children}
+      <div className="p-6 lg:p-8">{children}</div>
     </section>
   );
 }
@@ -91,6 +82,10 @@ export default function ProfilePage() {
   const [passwordErrors, setPasswordErrors] = useState<FieldErrors>({});
   const [changingPassword, setChangingPassword] = useState(false);
 
+  // Avatar dialog state
+  const [showAvatarDialog, setShowAvatarDialog] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const confirmRef = useRef<HTMLInputElement>(null);
@@ -100,10 +95,6 @@ export default function ProfilePage() {
     if (next) window.setTimeout(() => setBanner(null), 4000);
   }, []);
 
-  /**
-   * One request for the profile, one for activity, in parallel. The activity
-   * feed is secondary, so it never blocks the page becoming usable.
-   */
   useEffect(() => {
     let cancelled = false;
 
@@ -140,15 +131,9 @@ export default function ProfilePage() {
 
   const strength = useMemo(() => passwordStrength(newPassword), [newPassword]);
 
-  /**
-   * The server copy of the theme is the durable one, so reconcile it with the
-   * live theme once the profile lands. Without this the two drift and the
-   * preference a user saves here is ignored on the next visit.
-   */
   useEffect(() => {
     if (profile && profile.is_dark_mode !== isDarkMode) setTheme(profile.is_dark_mode);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profile?.is_dark_mode]);
+  }, [profile?.is_dark_mode, isDarkMode, setTheme]);
 
   const handleField = (field: keyof ProfileDraft) => (event: React.ChangeEvent<HTMLInputElement>) => {
     const value = event.target.value;
@@ -192,8 +177,6 @@ export default function ProfilePage() {
     event.preventDefault();
     if (changingPassword) return;
 
-    // The current password is passed through so the same-as-before rule is checked
-    // here rather than coming back as a 422 after the round trip.
     if (!isPasswordComplete(newPassword, confirmPassword, currentPassword)) {
       setPasswordErrors({ password: 'Your new password does not meet the requirements yet.' });
       return;
@@ -232,35 +215,52 @@ export default function ProfilePage() {
     }
   };
 
-  const handleAvatar = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = '';
     if (!file) return;
 
-    // Cheap checks first (type, size), then the byte signature. The declared
-    // MIME type is attacker-supplied, so it cannot be the only gate.
     const problem = validateAvatar(file);
     if (problem) {
       showBanner({ kind: 'error', text: problem });
       return;
     }
 
-    const contentProblem = await validateAvatarContent(file);
-    if (contentProblem) {
-      showBanner({ kind: 'error', text: contentProblem });
-      return;
-    }
+    validateAvatarContent(file).then((contentProblem) => {
+      if (contentProblem) {
+        showBanner({ kind: 'error', text: contentProblem });
+        return;
+      }
+      const url = URL.createObjectURL(file);
+      setSelectedFile(file);
+      setPreviewUrl(url);
+      setShowAvatarDialog(true);
+    });
+  };
 
+  const handleAvatarSave = async () => {
+    if (!selectedFile) return;
     setUploading(true);
     try {
-      const body = await api.uploadAvatar(file);
+      const body = await api.uploadAvatar(selectedFile);
       setProfile((prev) => (prev ? { ...prev, avatar_url: body?.avatar_url ?? prev.avatar_url } : prev));
       showBanner({ kind: 'ok', text: 'Photo updated.' });
     } catch {
       showBanner({ kind: 'error', text: 'We could not upload that photo. Please try another.' });
     } finally {
       setUploading(false);
+      setShowAvatarDialog(false);
+      setSelectedFile(null);
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      setPreviewUrl(null);
     }
+  };
+
+  const handleAvatarCancel = () => {
+    setShowAvatarDialog(false);
+    setSelectedFile(null);
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    setPreviewUrl(null);
   };
 
   if (loadError) {
@@ -269,6 +269,7 @@ export default function ProfilePage() {
         <Header title="User Profile" subtitle="Manage your account" />
         <main className="mx-auto w-full max-w-3xl p-4 md:p-6">
           <div className="card p-10 text-center" role="alert">
+            <X size={32} className="mx-auto mb-4 text-[var(--danger)]" />
             <h2 className="font-display text-lg font-bold">Profile unavailable</h2>
             <p className="mx-auto mt-2 max-w-sm text-sm text-[var(--text-muted)]">{loadError}</p>
             <button type="button" className="btn btn-primary mx-auto mt-6" onClick={() => window.location.reload()}>
@@ -293,111 +294,83 @@ export default function ProfilePage() {
     <>
       <Header title="User Profile" subtitle="Manage your identity, sign-in and preferences" />
 
-      <main className="mx-auto w-full max-w-7xl overflow-x-hidden p-3 pb-24 sm:p-4 sm:pb-6 md:p-6">
+      <main className="mx-auto w-full overflow-x-hidden p-3 pb-24 sm:p-4 sm:pb-6 md:p-6">
         <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-12">
-          {/* Identity */}
-          <div className="space-y-6 lg:col-span-4">
-            <section className="card flex flex-col items-center p-8 text-center">
-              <div className="group relative mb-6">
-                {profile.avatar_url ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={profile.avatar_url}
-                    // Was alt="", which marks the image decorative and makes a
-                    // screen reader skip it. It is the operator's own photo, so
-                    // it should carry their name.
-                    alt={`${profile.full_name} profile photo`}
-                    className="h-32 w-32 rounded-full border-2 border-[var(--accent)] object-cover"
-                  />
-                ) : (
-                  <div className="flex h-32 w-32 items-center justify-center rounded-full border-2 border-[var(--accent)] bg-[var(--accent-glow)]">
-                    <span className="font-display text-4xl font-bold text-[var(--accent)]" aria-hidden="true">
-                      {initials(profile.full_name)}
+
+          {/* Identity header */}
+          <div className="lg:col-span-12">
+            <section className="card overflow-hidden">
+              <div className="px-6 py-8 lg:px-8 lg:py-10">
+                <div className="flex flex-col items-center text-center gap-4">
+                  <div className="relative group">
+                    {profile.avatar_url ? (
+                      <img
+                        src={profile.avatar_url}
+                        alt={`${profile.full_name} profile photo`}
+                        className="h-40 w-40 rounded-full border-4 border-[var(--accent)] object-cover shadow-lg"
+                      />
+                    ) : (
+                      <div className="flex h-40 w-40 items-center justify-center rounded-full border-4 border-[var(--accent)] bg-[var(--accent-glow)]">
+                        <span className="font-display text-5xl font-bold text-[var(--accent)]" aria-hidden="true">
+                          {initials(profile.full_name)}
+                        </span>
+                      </div>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={() => fileRef.current?.click()}
+                      disabled={uploading}
+                      aria-label="Change profile photo"
+                      className="absolute bottom-0 right-0 rounded-full bg-[var(--accent)] p-2 text-[var(--bg-base)] shadow-xl transition-transform hover:scale-110 disabled:opacity-60"
+                    >
+                      {uploading ? <Loader2 size={18} className="animate-spin" /> : <Camera size={18} />}
+                    </button>
+                    <input
+                      ref={fileRef}
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      onChange={handleFileSelect}
+                      className="sr-only"
+                      tabIndex={-1}
+                    />
+                  </div>
+
+                  <h1 className="font-display text-2xl font-black tracking-tight">{profile.full_name}</h1>
+                  <p className="text-sm font-medium text-[var(--text-muted)]">{profile.email}</p>
+
+                  <div className="flex items-center gap-4">
+                    <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-[var(--border)] bg-[var(--bg-input)] text-xs font-medium">
+                      <span className="w-2 h-2 rounded-full bg-[var(--success)]" />
+                      {roleLabel(profile.role)}
                     </span>
+                    {profile.facility_name && (
+                      <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-[var(--border)] bg-[var(--bg-input)] text-xs font-medium">
+                        <MapPin size={12} className="text-[var(--text-muted)]" aria-hidden="true" />
+                        {profile.facility_name}
+                      </span>
+                    )}
                   </div>
-                )}
+                </div>
 
-                <button
-                  type="button"
-                  onClick={() => fileRef.current?.click()}
-                  disabled={uploading}
-                  aria-label="Change profile photo"
-                  className="absolute bottom-0 right-0 rounded-full bg-[var(--accent)] p-2 text-[var(--bg-base)] shadow-lg transition-transform hover:scale-110 disabled:opacity-60"
-                >
-                  {uploading ? <Loader2 size={18} className="animate-spin" /> : <Camera size={18} />}
-                </button>
-                <input
-                  ref={fileRef}
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp"
-                  onChange={handleAvatar}
-                  className="sr-only"
-                  tabIndex={-1}
-                />
+                <dl className="mt-8 grid grid-cols-2 gap-x-8 gap-y-4 border-t border-[var(--border)] pt-6">
+                  <div className="flex flex-col">
+                    <dt className="text-[10px] uppercase tracking-wider text-[var(--text-muted)] font-mono">Last sign-in</dt>
+                    <dd className="text-sm font-medium">{relativeTime(profile.last_login_at)}</dd>
+                  </div>
+                  <div className="flex flex-col">
+                    <dt className="text-[10px] uppercase tracking-wider text-[var(--text-muted)] font-mono">Member since</dt>
+                    <dd className="text-sm font-medium">{memberSince(profile.created_at)}</dd>
+                  </div>
+                </dl>
               </div>
-
-              <h2 className="font-display text-xl font-black">{profile.full_name}</h2>
-              <p className="mb-6 text-sm font-medium text-[var(--text-muted)]">{profile.email}</p>
-
-              <dl className="w-full space-y-3 border-t border-[var(--border)] pt-5 text-left">
-                <div className="flex items-center justify-between gap-3">
-                  <dt className="text-xs text-[var(--text-muted)]">Role</dt>
-                  <dd className="badge badge-online">{roleLabel(profile.role)}</dd>
-                </div>
-                {profile.facility_name && (
-                  <div className="flex items-center justify-between gap-3">
-                    <dt className="text-xs text-[var(--text-muted)]">Facility</dt>
-                    <dd className="flex items-center gap-1.5 text-xs font-medium">
-                      <MapPin size={13} className="text-[var(--text-muted)]" aria-hidden="true" />
-                      {profile.facility_name}
-                    </dd>
-                  </div>
-                )}
-                <div className="flex items-center justify-between gap-3">
-                  <dt className="text-xs text-[var(--text-muted)]">Last sign-in</dt>
-                  <dd className="text-xs font-medium">{relativeTime(profile.last_login_at)}</dd>
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                  <dt className="text-xs text-[var(--text-muted)]">Member since</dt>
-                  <dd className="text-xs font-medium">{memberSince(profile.created_at)}</dd>
-                </div>
-              </dl>
             </section>
           </div>
 
-          {/* Details + security */}
-          <div className="space-y-6 lg:col-span-8">
-            {banner && (
-              <div
-                role="status"
-                aria-live="polite"
-                className="flex items-start gap-3 rounded-xl border px-4 py-3 text-sm"
-                style={{
-                  borderColor: banner.kind === 'ok' ? 'rgba(52,211,153,0.4)' : 'rgba(248,113,113,0.4)',
-                  background: banner.kind === 'ok' ? 'rgba(6,78,59,0.25)' : 'rgba(127,29,29,0.25)',
-                  color: banner.kind === 'ok' ? '#A7F3D0' : '#FECACA',
-                }}
-              >
-                {banner.kind === 'ok' ? <Check size={16} className="mt-0.5 shrink-0" /> : <X size={16} className="mt-0.5 shrink-0" />}
-                <span>{banner.text}</span>
-              </div>
-            )}
-
-            <form onSubmit={handleSave} noValidate>
-              <Section
-                title="Account details"
-                icon={User}
-                action={
-                  <button
-                    type="submit"
-                    className="btn btn-primary flex items-center gap-2 px-4 py-2 text-xs font-black uppercase tracking-widest"
-                    disabled={!dirty || saving}
-                  >
-                    {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-                    {saving ? 'Saving' : 'Save'}
-                  </button>
-                }
-              >
+          {/* Account details */}
+          <div className="lg:col-span-6">
+            <Section title="Account details" icon={User}>
+              <form onSubmit={handleSave} noValidate>
                 <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                   <Field id="profile-name" label="Full name" icon={User} error={errors.full_name}>
                     <input
@@ -460,16 +433,28 @@ export default function ProfilePage() {
                 </div>
 
                 {dirty && (
-                  <p className="mt-5 text-xs text-[var(--text-muted)]">
+                  <p className="mt-4 text-xs text-[var(--text-muted)]">
                     You have unsaved changes.
                   </p>
                 )}
-              </Section>
-            </form>
 
+                <div className="mt-8 pt-6 border-t border-[var(--border)] flex justify-end">
+                  <button
+                    type="submit"
+                    className="btn btn-primary flex items-center gap-2 px-5 py-2.5 text-xs font-black uppercase tracking-widest"
+                    disabled={!dirty || saving}
+                  >
+                    {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                    {saving ? 'Saving' : 'Save changes'}
+                  </button>
+                </div>
+              </form>
+            </Section>
+
+            {/* Preferences */}
             <Section title="Preferences" icon={ShieldCheck}>
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <label className="flex cursor-pointer items-center justify-between gap-4 rounded-xl border border-[var(--border)] bg-[var(--bg-input)] p-4">
+                <label className="flex cursor-pointer items-center justify-between gap-4 rounded-xl border border-[var(--border)] bg-[var(--bg-input)] p-4 hover:bg-[var(--bg-hover)] transition-colors">
                   <span>
                     <span className="block text-sm font-bold">Email alerts</span>
                     <span className="block text-xs text-[var(--text-muted)]">Get an email when a device reports a fault.</span>
@@ -494,7 +479,7 @@ export default function ProfilePage() {
                   />
                 </label>
 
-                <label className="flex cursor-pointer items-center justify-between gap-4 rounded-xl border border-[var(--border)] bg-[var(--bg-input)] p-4">
+                <label className="flex cursor-pointer items-center justify-between gap-4 rounded-xl border border-[var(--border)] bg-[var(--bg-input)] p-4 hover:bg-[var(--bg-hover)] transition-colors">
                   <span>
                     <span className="block text-sm font-bold">Dark theme</span>
                     <span className="block text-xs text-[var(--text-muted)]">Use the deep charcoal palette across the hub.</span>
@@ -523,9 +508,12 @@ export default function ProfilePage() {
                 </label>
               </div>
             </Section>
+          </div>
 
+          {/* Password + Activity */}
+          <div className="lg:col-span-6 space-y-6">
             <Section title="Password" icon={KeyRound}>
-              <form onSubmit={handlePassword} noValidate className="max-w-md space-y-4">
+              <form onSubmit={handlePassword} noValidate className="space-y-4">
                 <Field id="current-password" label="Current password" icon={KeyRound} error={passwordErrors.current_password}>
                   <input
                     id="current-password"
@@ -606,19 +594,15 @@ export default function ProfilePage() {
               </form>
             </Section>
 
-            <Section
-              title="Recent activity"
-              icon={Activity}
-              action={
-                activityState === 'loading' ? (
-                  <span className="text-xs text-[var(--text-muted)]">Loading…</span>
-                ) : null
-              }
-            >
-              {activity.length === 0 ? (
-                <p className="py-6 text-center text-sm text-[var(--text-muted)]">
-                  No account activity recorded yet.
-                </p>
+            <Section title="Recent activity" icon={Activity}>
+              {activityState === 'loading' ? (
+                <div className="h-32 flex items-center justify-center">
+                  <Loader2 size={20} className="animate-spin text-[var(--text-muted)]" />
+                </div>
+              ) : activity.length === 0 ? (
+                <div className="h-32 flex items-center justify-center">
+                  <p className="text-sm text-[var(--text-muted)]">No account activity recorded yet.</p>
+                </div>
               ) : (
                 <ul className="space-y-3">
                   {activity.map((entry) => (
@@ -643,6 +627,33 @@ export default function ProfilePage() {
             </Section>
           </div>
         </div>
+
+        {banner && (
+          <div
+            role="status"
+            aria-live="polite"
+            className="fixed bottom-6 right-6 z-50 flex items-start gap-3 rounded-xl border px-4 py-3 text-sm shadow-xl"
+            style={{
+              borderColor: banner.kind === 'ok' ? 'rgba(52,211,153,0.4)' : 'rgba(248,113,113,0.4)',
+              background: banner.kind === 'ok' ? 'rgba(6,78,59,0.25)' : 'rgba(127,29,29,0.25)',
+              color: banner.kind === 'ok' ? '#A7F3D0' : '#FECACA',
+            }}
+          >
+            {banner.kind === 'ok' ? <Check size={16} className="mt-0.5 shrink-0" /> : <X size={16} className="mt-0.5 shrink-0" />}
+            <span>{banner.text}</span>
+          </div>
+        )}
+
+        {showAvatarDialog && (
+          <AvatarDialog
+            file={selectedFile}
+            previewUrl={previewUrl}
+            uploading={uploading}
+            onSave={handleAvatarSave}
+            onCancel={handleAvatarCancel}
+            onClose={handleAvatarCancel}
+          />
+        )}
       </main>
     </>
   );

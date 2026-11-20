@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Bell, Search, User, Menu, Sun, Moon, LogOut, Settings as SettingsIcon, AlertTriangle, Zap, Info, CheckCircle } from 'lucide-react';
+import { Bell, Search, User, Menu, Sun, Moon, LogOut, AlertTriangle, Zap, Info, CheckCircle } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useUI } from '@/providers/UIProvider';
 import { useRouter } from 'next/navigation';
@@ -356,13 +356,6 @@ onClick={() => toggleDropdown('user')}
                   className="w-full text-left px-3 py-2 text-sm rounded-lg hover:bg-[var(--bg-hover)] flex items-center gap-2 text-[var(--text-secondary)]"
                 >
                   <User size={14}/> Profile
-                </Link>
-                <Link 
-                  href="/preferences"
-                  onClick={() => setActiveDropdown(null)}
-                  className="w-full text-left px-3 py-2 text-sm rounded-lg hover:bg-[var(--bg-hover)] flex items-center gap-2 text-[var(--text-secondary)]"
-                >
-                  <SettingsIcon size={14}/> Preferences
                 </Link>
                 <button onClick={handleLogout} className="w-full text-left px-3 py-2 text-sm rounded-lg hover:bg-[var(--danger-muted)] text-[var(--danger)] flex items-center gap-2 mt-1">
                   <LogOut size={14}/> Sign Out
