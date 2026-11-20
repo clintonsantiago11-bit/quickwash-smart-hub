@@ -36,14 +36,14 @@ export const UNAUTHORIZED_EVENT = 'quickwash:unauthorized';
  */
 async function syncSessionCookie(token: string, persistent: boolean): Promise<void> {
   try {
-    await fetch('/api/session', {
+    await fetch(`${API_BASE}/session`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${token}`,
         Accept: 'application/json',
         'Content-Type': 'application/json',
       },
-      credentials: 'same-origin',
+      credentials: 'include',
       // The cookie is HttpOnly, so the server owns its lifetime. It has to be
       // told, or every cookie becomes a persistent one and a shared terminal
       // keeps camera access until the full 8 hours are up.

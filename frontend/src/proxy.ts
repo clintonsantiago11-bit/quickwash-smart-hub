@@ -49,12 +49,10 @@ export function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
-  if (!hasSessionShape(request.cookies.get('qhs_session')?.value)) {
-    const url = request.nextUrl.clone();
-    url.pathname = '/login';
-    return NextResponse.redirect(url);
-  }
-
+  // The qhs_session cookie is only needed for the camera proxy, which
+  // verifies the signature properly on the Node runtime. The Bearer token
+  // in localStorage is the real auth boundary, enforced on every API call.
+  // Don't block the dashboard shell here.
   return NextResponse.next();
 }
 
