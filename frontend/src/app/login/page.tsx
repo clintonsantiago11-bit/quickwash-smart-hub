@@ -241,11 +241,7 @@ export default function LoginPage() {
       </main>
 
       {phase === 'success' && welcome && (
-        <WelcomeOverlay
-          text={welcome.text}
-          detail={welcome.detail}
-          onSkip={() => router.push('/')}
-        />
+        <WelcomeOverlay text={welcome.text} detail={welcome.detail} />
       )}
     </div>
   );
