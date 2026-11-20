@@ -1,21 +1,9 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { UIProvider } from "@/providers/UIProvider";
 import LayoutContent from "@/components/LayoutContent";
 import IdleLogout from "@/components/IdleLogout";
 import SessionWatcher from "@/components/SessionWatcher";
-
-const inter = Inter({
-  subsets: ["latin"],
-  variable: "--font-ui",
-});
-
-const jetbrainsMono = JetBrains_Mono({
-  weight: ["400", "500", "600", "700"],
-  subsets: ["latin"],
-  variable: "--font-mono",
-});
 
 export const metadata: Metadata = {
   title: "QuickWash Smart Hub — IoT Car Wash Dashboard",
@@ -35,8 +23,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning className={`${inter.variable} ${jetbrainsMono.variable} h-full antialiased`}>
-      <body className="antialiased" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning className="h-full antialiased">
+      <body className="antialiased">
         <UIProvider>
           <LayoutContent>{children}</LayoutContent>
           {/* Signs an unattended terminal out, so the next person at the
