@@ -612,7 +612,7 @@ export default function ProfilePage() {
                 <div className="h-32 flex items-center justify-center">
                   <p className="text-sm text-[var(--text-muted)]">No account activity recorded yet.</p>
                 </div>
-              ) : (
+              ) : (<>
                 <ul className="space-y-3">
                   {paginatedActivity.map((entry) => (
                     <li
@@ -657,6 +657,7 @@ export default function ProfilePage() {
                     </button>
                   </div>
                 )}
+                </>
               )}
             </Section>
           </div>
