@@ -27,7 +27,7 @@ export default function AvatarDialog({
   onClose,
 }: AvatarDialogProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
-  const [dismissTimeout, setDismissTimeout] = useState<ReturnType<typeof setTimeout> | null>(null);
+  const [dismissTimeout, setDismissTimeout] = useState<ReturnType<typeof window.setTimeout> | null>(null);
 
   // Clicking the backdrop closes the dialog.
   useEffect(() => {
