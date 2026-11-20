@@ -12,7 +12,7 @@ import { PageSkeleton } from '@/components/ui/Skeleton';
 import { useUI } from '@/providers/UIProvider';
 import {
   activityLabel, fieldErrorsFrom, initials, isDirty, isPasswordComplete,
-  passwordProblems, passwordStrength, relativeTime, roleLabel, toDraft, toPayload, toProfile, validateDraft, validateAvatar, validateAvatarContent,
+  passwordProblems, passwordStrength, relativeTime, roleLabel, toDraft, toPayload, toProfile, validateDraft, validateAvatar, validateAvatarContent, memberSince,
   type ActivityEntry, type FieldErrors, type Profile, type ProfileDraft,
 } from '@/lib/profile';
 
