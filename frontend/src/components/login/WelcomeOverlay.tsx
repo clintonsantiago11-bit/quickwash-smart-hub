@@ -32,6 +32,7 @@ export default function WelcomeOverlay({ text, detail, onSkip }: WelcomeOverlayP
       className="login-welcome"
       role="status"
       aria-live="polite"
+      onClick={onSkip}
     >
       {/* The card itself is not clickable: only the button is, so keyboard
           and pointer users get the same target. The overlay is dismissed by

@@ -9,7 +9,7 @@
 export const LAST_SIGN_IN_KEY = 'quickwash_last_sign_in_at';
 
 /** How long the greeting is shown before the dashboard takes over. */
-export const WELCOME_MS = 1600;
+export const WELCOME_MS = 2000;
 
 /**
  * Whether this browser has signed in before.
