@@ -3,7 +3,7 @@
 import Header from '@/components/Header';
 import AvatarDialog from '@/components/profile/AvatarDialog';
 import {
-  Activity, Briefcase, Camera, Check, KeyRound, Loader2, Mail, MapPin,
+  Activity, ArrowLeft, ArrowRight, Briefcase, Camera, Check, KeyRound, Loader2, Mail, MapPin,
   Phone, Save, ShieldCheck, User, X,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -75,6 +75,7 @@ export default function ProfilePage() {
 
   const [activity, setActivity] = useState<ActivityEntry[]>([]);
   const [activityState, setActivityState] = useState<'loading' | 'ready' | 'failed'>('loading');
+  const [activityPage, setActivityPage] = useState(0);
 
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -110,7 +111,7 @@ export default function ProfilePage() {
         if (!cancelled) setLoadError('We could not load your profile. Check your connection and try again.');
       });
 
-    api.getProfileActivity(8)
+    api.getProfileActivity(20)
       .then((body) => {
         if (!cancelled) setActivity(Array.isArray(body?.data) ? body.data : []);
       })
@@ -128,6 +129,14 @@ export default function ProfilePage() {
     () => (draft && saved ? isDirty(draft, saved) : false),
     [draft, saved]
   );
+
+  const ACTIVITY_PER_PAGE = 5;
+  const paginatedActivity = useMemo(
+    () => activity.slice(activityPage * ACTIVITY_PER_PAGE, (activityPage + 1) * ACTIVITY_PER_PAGE),
+    [activity, activityPage]
+  );
+
+  const totalActivityPages = Math.ceil(activity.length / ACTIVITY_PER_PAGE);
 
   const strength = useMemo(() => passwordStrength(newPassword), [newPassword]);
 
@@ -605,7 +614,7 @@ export default function ProfilePage() {
                 </div>
               ) : (
                 <ul className="space-y-3">
-                  {activity.map((entry) => (
+                  {paginatedActivity.map((entry) => (
                     <li
                       key={entry.id}
                       className="flex items-center justify-between gap-4 rounded-xl border border-[var(--border)] bg-[var(--bg-elevated)] p-4"
@@ -623,6 +632,31 @@ export default function ProfilePage() {
                     </li>
                   ))}
                 </ul>
+                {totalActivityPages > 1 && (
+                  <div className="mt-4 flex items-center justify-between px-2">
+                    <button
+                      type="button"
+                      onClick={() => setActivityPage((p) => Math.max(p - 1, 0))}
+                      disabled={activityPage === 0}
+                      className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-[var(--border)] bg-[var(--bg-input)] text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      <ArrowLeft size={14} className="shrink-0" />
+                      Previous
+                    </button>
+                    <span className="text-xs text-[var(--text-muted)]">
+                      Page {activityPage + 1} of {totalActivityPages}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setActivityPage((p) => Math.min(p + 1, totalActivityPages - 1))}
+                      disabled={activityPage >= totalActivityPages - 1}
+                      className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-[var(--border)] bg-[var(--bg-input)] text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      Next
+                      <ArrowRight size={14} className="shrink-0" />
+                    </button>
+                  </div>
+                )}
               )}
             </Section>
           </div>
